@@ -16,6 +16,7 @@ const embedData = new Map();
 const ticketConfig = new Map(); // guildId -> { channelId, roleId }
 const supportTicketConfig = new Map(); // guildId -> { channelId, roleId }
 const openTickets = new Map(); // userId -> { channelId, ticketNumber, randomNumber, type }
+const ticketCategories = new Map(); // guildId -> { setupCategoryId, supportCategoryId }
 let ticketCounter = 1;
 
 const ALLOWED_GUILD_ID = '1385691441967267953';
@@ -26,13 +27,20 @@ client.on('guildCreate', guild => {
     }
 });
 
-client.on('ready', () => {
+client.on('ready', async () => {
     // If the bot is in any other guild, leave them
     client.guilds.cache.forEach(guild => {
         if (guild.id !== ALLOWED_GUILD_ID) {
             guild.leave();
         }
     });
+    
+    // Restore existing ticket categories
+    const guild = client.guilds.cache.get(ALLOWED_GUILD_ID);
+    if (guild) {
+        await restoreTicketCategories(guild);
+    }
+    
     console.log(`Logged in as ${client.user.tag}!`);
     console.log('Bot is ready! Use /embed to create rich embeds.');
 });
@@ -125,9 +133,14 @@ async function handleButtonInteraction(interaction) {
         const ticketNumber = ticketCounter++;
         const randomNumber = Math.floor(Math.random() * 1000000);
         const channelName = `🟢| ${userId}${randomNumber}`;
+        
+        // Get or create setup category
+        const categoryId = await getOrCreateTicketCategory(guild, 'setup');
+        
         const ticketChannel = await guild.channels.create({
             name: channelName,
-            type: 0, // GUILD_TEXT
+            type: ChannelType.GuildText,
+            parent: categoryId, // Place channel under the category
             permissionOverwrites: [
                 { id: guild.roles.everyone, deny: ['ViewChannel'] },
                 { id: userId, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] },
@@ -166,9 +179,14 @@ async function handleButtonInteraction(interaction) {
         const ticketNumber = ticketCounter++;
         const randomNumber = Math.floor(Math.random() * 1000000);
         const channelName = `🟢| ${userId}${randomNumber}`;
+        
+        // Get or create support category
+        const categoryId = await getOrCreateTicketCategory(guild, 'support');
+        
         const ticketChannel = await guild.channels.create({
             name: channelName,
-            type: 0, // GUILD_TEXT
+            type: ChannelType.GuildText,
+            parent: categoryId, // Place channel under the category
             permissionOverwrites: [
                 { id: guild.roles.everyone, deny: ['ViewChannel'] },
                 { id: userId, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] },
@@ -506,6 +524,85 @@ async function handleTicketClose(interaction) {
 
 function isAllowedGuild(interaction) {
     return interaction.guildId === ALLOWED_GUILD_ID;
+}
+
+// Helper function to get or create ticket categories
+async function getOrCreateTicketCategory(guild, categoryType) {
+    const guildId = guild.id;
+    let categories = ticketCategories.get(guildId);
+    
+    if (!categories) {
+        categories = { setupCategoryId: null, supportCategoryId: null };
+        ticketCategories.set(guildId, categories);
+    }
+    
+    let categoryId = categories[`${categoryType}CategoryId`];
+    
+    // If category doesn't exist, create it
+    if (!categoryId) {
+        let categoryName, categoryColor;
+        
+        if (categoryType === 'setup') {
+            categoryName = '🟢 Zentro Setup Tickets';
+            categoryColor = 0x00FF00; // Green
+        } else if (categoryType === 'support') {
+            categoryName = '🆘 Zentro Support Tickets';
+            categoryColor = 0xFF0000; // Red
+        }
+        
+        try {
+            const category = await guild.channels.create({
+                name: categoryName,
+                type: ChannelType.GuildCategory,
+                permissionOverwrites: [
+                    {
+                        id: guild.roles.everyone,
+                        deny: ['ViewChannel']
+                    }
+                ]
+            });
+            
+            categoryId = category.id;
+            categories[`${categoryType}CategoryId`] = categoryId;
+            ticketCategories.set(guildId, categories);
+            
+            console.log(`Created ${categoryType} category: ${categoryName} (${categoryId})`);
+        } catch (error) {
+            console.error(`Failed to create ${categoryType} category:`, error);
+            return null;
+        }
+    }
+    
+    return categoryId;
+}
+
+// Function to restore existing ticket categories on bot startup
+async function restoreTicketCategories(guild) {
+    const guildId = guild.id;
+    let categories = ticketCategories.get(guildId);
+    
+    if (!categories) {
+        categories = { setupCategoryId: null, supportCategoryId: null };
+        ticketCategories.set(guildId, categories);
+    }
+    
+    // Check for existing categories
+    const existingCategories = guild.channels.cache.filter(channel => 
+        channel.type === ChannelType.GuildCategory && 
+        (channel.name === '🟢 Zentro Setup Tickets' || channel.name === '🆘 Zentro Support Tickets')
+    );
+    
+    existingCategories.forEach(category => {
+        if (category.name === '🟢 Zentro Setup Tickets') {
+            categories.setupCategoryId = category.id;
+            console.log(`Restored setup category: ${category.name} (${category.id})`);
+        } else if (category.name === '🆘 Zentro Support Tickets') {
+            categories.supportCategoryId = category.id;
+            console.log(`Restored support category: ${category.name} (${category.id})`);
+        }
+    });
+    
+    ticketCategories.set(guildId, categories);
 }
 
 client.login(process.env.TOKEN); 
