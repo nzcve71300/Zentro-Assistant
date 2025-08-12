@@ -271,6 +271,58 @@ async function handleButtonInteraction(interaction) {
             new ActionRowBuilder().addComponents(descriptionInput)
         );
         await interaction.showModal(modal);
+    } else if (interaction.customId === 'edit_text') {
+        // Modal for editing embed text
+        const modal = new ModalBuilder()
+            .setCustomId('embed_text_modal')
+            .setTitle('Edit Embed Text');
+        const titleInput = new TextInputBuilder()
+            .setCustomId('embed_title')
+            .setLabel('Embed Title')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Enter the embed title...')
+            .setValue(data.title || '🎯 **Embed Creator**')
+            .setRequired(false);
+        const descriptionInput = new TextInputBuilder()
+            .setCustomId('embed_description')
+            .setLabel('Embed Description')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Enter the embed description...')
+            .setValue(data.description || 'Create beautiful, rich embeds with this powerful tool!')
+            .setRequired(false);
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(titleInput),
+            new ActionRowBuilder().addComponents(descriptionInput)
+        );
+        await interaction.showModal(modal);
+    } else if (interaction.customId === 'edit_style') {
+        // Modal for editing embed style
+        const modal = new ModalBuilder()
+            .setCustomId('embed_style_modal')
+            .setTitle('Customize Embed Style');
+        const colorInput = new TextInputBuilder()
+            .setCustomId('embed_color')
+            .setLabel('Embed Color (Hex Code)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('#0099ff')
+            .setValue(data.color || '#5865F2')
+            .setRequired(false);
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(colorInput)
+        );
+        await interaction.showModal(modal);
+    } else if (interaction.customId === 'send_embed') {
+        // Send the embed to the channel
+        const embed = new EmbedBuilder()
+            .setTitle(data.title)
+            .setDescription(data.description)
+            .setColor(data.color)
+            .setTimestamp(data.timestamp ? new Date() : null)
+            .setThumbnail(data.thumbnail ? interaction.client.user.displayAvatarURL() : null)
+            .setFooter({ text: 'Powered by Zentro • Rich Embed Creator', iconURL: interaction.client.user.displayAvatarURL() });
+        
+        await interaction.channel.send({ embeds: [embed] });
+        await interaction.reply({ content: '✅ Embed sent successfully!', ephemeral: true });
     }
 }
 
