@@ -272,6 +272,15 @@ async function handleButtonInteraction(interaction) {
         );
         await interaction.showModal(modal);
     } else if (interaction.customId === 'edit_text') {
+        // Get embed data for this user
+        const data = embedData.get(userId) || {
+            title: '🎯 **Embed Creator**',
+            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
+            color: '#5865F2',
+            timestamp: true,
+            thumbnail: true
+        };
+        
         // Modal for editing embed text
         const modal = new ModalBuilder()
             .setCustomId('embed_text_modal')
@@ -296,6 +305,15 @@ async function handleButtonInteraction(interaction) {
         );
         await interaction.showModal(modal);
     } else if (interaction.customId === 'edit_style') {
+        // Get embed data for this user
+        const data = embedData.get(userId) || {
+            title: '🎯 **Embed Creator**',
+            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
+            color: '#5865F2',
+            timestamp: true,
+            thumbnail: true
+        };
+        
         // Modal for editing embed style
         const modal = new ModalBuilder()
             .setCustomId('embed_style_modal')
@@ -312,6 +330,15 @@ async function handleButtonInteraction(interaction) {
         );
         await interaction.showModal(modal);
     } else if (interaction.customId === 'send_embed') {
+        // Get embed data for this user
+        const data = embedData.get(userId) || {
+            title: '🎯 **Embed Creator**',
+            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
+            color: '#5865F2',
+            timestamp: true,
+            thumbnail: true
+        };
+        
         // Send the embed to the channel
         const embed = new EmbedBuilder()
             .setTitle(data.title)
