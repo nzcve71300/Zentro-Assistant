@@ -230,7 +230,7 @@ async function handleButtonInteraction(interaction) {
                 new ButtonBuilder()
                     .setLabel('BUY ZENTRO-BOT')
                     .setStyle(ButtonStyle.Link)
-                    .setURL('https://zentrostore.netlify.app/')
+                    .setURL('https://zentrobot.netlify.app/')
             );
         await interaction.reply({ embeds: [embed], components: [row], ephemeral: true });
     } else if (interaction.customId === 'zentro_submit_info') {
