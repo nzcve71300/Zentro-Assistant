@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits, SlashCommandBuilder, ChannelType } = require('discord.js');
 require('dotenv').config();
+const Database = require('./database');
 
 const client = new Client({
     intents: [
@@ -9,10 +10,13 @@ const client = new Client({
     ]
 });
 
+// Initialize database
+const db = new Database();
+
 // Store embed data temporarily (in production, use a database)
 const embedData = new Map();
 
-// Ticket system state
+// Ticket system state (will be loaded from database on startup)
 const ticketConfig = new Map(); // guildId -> { channelId, roleId }
 const supportTicketConfig = new Map(); // guildId -> { channelId, roleId }
 const openTickets = new Map(); // userId -> { channelId, ticketNumber, randomNumber, type }
@@ -35,14 +39,22 @@ client.on('ready', async () => {
         }
     });
     
-    // Restore existing ticket categories
-    const guild = client.guilds.cache.get(ALLOWED_GUILD_ID);
-    if (guild) {
-        await restoreTicketCategories(guild);
+    try {
+        // Load all data from database
+        await loadDataFromDatabase();
+        
+        // Restore existing ticket categories
+        const guild = client.guilds.cache.get(ALLOWED_GUILD_ID);
+        if (guild) {
+            await restoreTicketCategories(guild);
+        }
+        
+        console.log(`Logged in as ${client.user.tag}!`);
+        console.log('Bot is ready! Use /embed to create rich embeds.');
+        console.log('Database loaded successfully!');
+    } catch (error) {
+        console.error('Error loading data from database:', error);
     }
-    
-    console.log(`Logged in as ${client.user.tag}!`);
-    console.log('Bot is ready! Use /embed to create rich embeds.');
 });
 
 client.on('interactionCreate', async interaction => {
@@ -70,12 +82,12 @@ client.on('interactionCreate', async interaction => {
 async function handleEmbedCommand(interaction) {
     const embed = new EmbedBuilder()
         .setTitle('🎯 **Embed Creator**')
-        .setDescription('Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support')
+        .setDescription('Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support')
         .setColor('#5865F2')
         .setThumbnail(client.user.displayAvatarURL())
         .addFields(
             { name: '📋 **Current Settings**', value: 'Title: `Embed Preview`\nDescription: `This is a test`\nColor: `#5865F2`', inline: true },
-            { name: '⚙️ **Quick Actions**', value: 'Click the buttons below to customize your embed and make it look professional!', inline: true }
+            { name: '🎨 **Available Colors**', value: 'Red, Green, Blue, Pink, Purple, Yellow, Orange\nOr use hex codes like #FF0000', inline: true }
         )
         .setTimestamp()
         .setFooter({ text: 'Powered by Zentro • Rich Embed Creator', iconURL: client.user.displayAvatarURL() });
@@ -102,7 +114,7 @@ async function handleEmbedCommand(interaction) {
     // Store initial embed data
     embedData.set(interaction.user.id, {
         title: '🎯 **Embed Creator**',
-        description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
+        description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
         color: '#5865F2',
         timestamp: true,
         thumbnail: true
@@ -118,8 +130,10 @@ async function handleEmbedCommand(interaction) {
 async function handleButtonInteraction(interaction) {
     const userId = interaction.user.id;
     const guildId = interaction.guildId;
-    const config = ticketConfig.get(guildId);
-    const supportConfig = supportTicketConfig.get(guildId);
+    
+    // Get configs from database
+    const config = await db.getTicketConfig(guildId);
+    const supportConfig = await db.getSupportTicketConfig(guildId);
     const orange = 0xFFA500;
     
     if (interaction.customId === 'zentro_setup') {
@@ -129,8 +143,9 @@ async function handleButtonInteraction(interaction) {
         }
         // Create private ticket channel
         const guild = interaction.guild;
-        const staffRole = config.roleId;
-        const ticketNumber = ticketCounter++;
+        const staffRole = config.role_id;
+        const ticketNumber = await db.getTicketCounter();
+        await db.incrementTicketCounter();
         const randomNumber = Math.floor(Math.random() * 1000000);
         const channelName = `🟢| ${userId}${randomNumber}`;
         
@@ -147,6 +162,9 @@ async function handleButtonInteraction(interaction) {
                 { id: staffRole, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] }
             ]
         });
+        
+        // Save ticket to database
+        await db.saveOpenTicket(userId, ticketChannel.id, ticketNumber, randomNumber, 'setup');
         openTickets.set(userId, { channelId: ticketChannel.id, ticketNumber, randomNumber, type: 'setup' });
         // Orange embed with instructions
         const embed = new EmbedBuilder()
@@ -175,8 +193,9 @@ async function handleButtonInteraction(interaction) {
         }
         // Create private support ticket channel
         const guild = interaction.guild;
-        const staffRole = supportConfig.roleId;
-        const ticketNumber = ticketCounter++;
+        const staffRole = supportConfig.role_id;
+        const ticketNumber = await db.getTicketCounter();
+        await db.incrementTicketCounter();
         const randomNumber = Math.floor(Math.random() * 1000000);
         const channelName = `🟢| ${userId}${randomNumber}`;
         
@@ -193,6 +212,9 @@ async function handleButtonInteraction(interaction) {
                 { id: staffRole, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] }
             ]
         });
+        
+        // Save ticket to database
+        await db.saveOpenTicket(userId, ticketChannel.id, ticketNumber, randomNumber, 'support');
         openTickets.set(userId, { channelId: ticketChannel.id, ticketNumber, randomNumber, type: 'support' });
         
         // Send initial message with submit button
@@ -275,7 +297,7 @@ async function handleButtonInteraction(interaction) {
         // Get embed data for this user
         const data = embedData.get(userId) || {
             title: '🎯 **Embed Creator**',
-            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
+            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
             color: '#5865F2',
             timestamp: true,
             thumbnail: true
@@ -308,7 +330,7 @@ async function handleButtonInteraction(interaction) {
         // Get embed data for this user
         const data = embedData.get(userId) || {
             title: '🎯 **Embed Creator**',
-            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
+            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
             color: '#5865F2',
             timestamp: true,
             thumbnail: true
@@ -320,9 +342,9 @@ async function handleButtonInteraction(interaction) {
             .setTitle('Customize Embed Style');
         const colorInput = new TextInputBuilder()
             .setCustomId('embed_color')
-            .setLabel('Embed Color (Hex Code)')
+            .setLabel('Embed Color (Hex Code or Color Name)')
             .setStyle(TextInputStyle.Short)
-            .setPlaceholder('#0099ff')
+            .setPlaceholder('#0099ff or Red, Green, Blue, Pink, Purple, Yellow, Orange')
             .setValue(data.color || '#5865F2')
             .setRequired(false);
         modal.addComponents(
@@ -333,7 +355,7 @@ async function handleButtonInteraction(interaction) {
         // Get embed data for this user
         const data = embedData.get(userId) || {
             title: '🎯 **Embed Creator**',
-            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
+            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
             color: '#5865F2',
             timestamp: true,
             thumbnail: true
@@ -357,7 +379,7 @@ async function handleModalSubmit(interaction) {
     const userId = interaction.user.id;
     const data = embedData.get(userId) || {
         title: '🎯 **Embed Creator**',
-        description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
+        description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
         color: '#5865F2',
         timestamp: true,
         thumbnail: true
@@ -368,7 +390,7 @@ async function handleModalSubmit(interaction) {
         const description = interaction.fields.getTextInputValue('embed_description');
 
         data.title = title || '🎯 **Embed Creator**';
-        data.description = description || 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes\n• 📤 Send professional embeds\n• 🎯 Rich formatting support';
+        data.description = description || 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support';
 
         embedData.set(userId, data);
 
@@ -404,12 +426,15 @@ async function handleModalSubmit(interaction) {
             components: [row]
         });
     } else if (interaction.customId === 'embed_style_modal') {
-        const color = interaction.fields.getTextInputValue('embed_color');
+        const colorInput = interaction.fields.getTextInputValue('embed_color');
         
-        // Validate hex color
+        // Convert color name to hex or use as is
+        const color = getColorHex(colorInput);
+        
+        // Validate hex color (after conversion)
         const hexRegex = /^#[0-9A-F]{6}$/i;
         if (!hexRegex.test(color)) {
-            await interaction.reply({ content: 'Please enter a valid hex color code (e.g., #0099ff)', ephemeral: true });
+            await interaction.reply({ content: 'Please enter a valid hex color code (e.g., #0099ff) or color name (Red, Green, Blue, Pink, Purple, Yellow, Orange)', ephemeral: true });
             return;
         }
 
@@ -481,7 +506,8 @@ async function handleSetupTicket(interaction) {
         await interaction.reply({ content: 'You must specify both a channel and a role.', ephemeral: true });
         return;
     }
-    // Save config for this guild
+    // Save config for this guild to database
+    await db.saveTicketConfig(interaction.guildId, channel.id, role.id);
     ticketConfig.set(interaction.guildId, { channelId: channel.id, roleId: role.id });
 
     // Orange color
@@ -520,7 +546,8 @@ async function handleSupportTicketSetup(interaction) {
         await interaction.reply({ content: 'You must specify both a channel and a role.', ephemeral: true });
         return;
     }
-    // Save config for this guild
+    // Save config for this guild to database
+    await db.saveSupportTicketConfig(interaction.guildId, channel.id, role.id);
     supportTicketConfig.set(interaction.guildId, { channelId: channel.id, roleId: role.id });
 
     // Orange color
@@ -546,17 +573,17 @@ async function handleSupportTicketSetup(interaction) {
 
 async function handleTicketClose(interaction) {
     // Only allow in ticket channels
-    const userId = [...openTickets.entries()].find(([_, v]) => v.channelId === interaction.channel.id)?.[0];
-    if (!userId) {
+    const ticket = await db.getOpenTicketByChannel(interaction.channel.id);
+    if (!ticket) {
         await interaction.reply({ content: 'This is not a ticket channel.', ephemeral: true });
         return;
     }
-    const ticket = openTickets.get(userId);
+    const userId = ticket.user_id;
     const orange = 0xFFA500;
     
     // Update channel name to closed format
     try {
-        await interaction.channel.setName(`🏁| ${userId}${ticket.randomNumber}`);
+        await interaction.channel.setName(`🏁| ${userId}${ticket.random_number}`);
     } catch (error) {
         console.error('Failed to rename channel:', error);
     }
@@ -564,7 +591,7 @@ async function handleTicketClose(interaction) {
     // Send finish message in channel
     const finishEmbed = new EmbedBuilder()
         .setTitle('🏁 Ticket Closed')
-        .setDescription(`🏁 ticket number:${ticket.ticketNumber}`)
+        .setDescription(`🏁 ticket number:${ticket.ticket_number}`)
         .setColor(orange)
         .setFooter({ text: 'Powered by Zentro', iconURL: interaction.client.user.displayAvatarURL() });
     await interaction.channel.send({ embeds: [finishEmbed] });
@@ -598,11 +625,93 @@ async function handleTicketClose(interaction) {
     }
     
     await interaction.reply({ content: 'Ticket will be closed and channel deleted in 1 minute.', ephemeral: true });
+    
+    // Remove ticket from database and memory
+    await db.deleteOpenTicket(userId);
     openTickets.delete(userId);
 }
 
 function isAllowedGuild(interaction) {
     return interaction.guildId === ALLOWED_GUILD_ID;
+}
+
+// Function to convert color names to hex codes
+function getColorHex(colorInput) {
+    const colorMap = {
+        'red': '#FF0000',
+        'green': '#00FF00', 
+        'blue': '#0000FF',
+        'pink': '#FF69B4',
+        'purple': '#800080',
+        'yellow': '#FFFF00',
+        'orange': '#FFA500'
+    };
+    
+    // Convert to lowercase for case-insensitive matching
+    const colorLower = colorInput.toLowerCase().trim();
+    
+    // Check if it's a color name
+    if (colorMap[colorLower]) {
+        return colorMap[colorLower];
+    }
+    
+    // If it's already a hex code, return as is
+    return colorInput;
+}
+
+// Function to load all data from database on startup
+async function loadDataFromDatabase() {
+    try {
+        // Load ticket configurations
+        const ticketConfigs = await db.loadAllTicketConfigs();
+        ticketConfigs.forEach(config => {
+            ticketConfig.set(config.guild_id, { 
+                channelId: config.channel_id, 
+                roleId: config.role_id 
+            });
+        });
+        console.log(`Loaded ${ticketConfigs.length} ticket configurations`);
+
+        // Load support ticket configurations
+        const supportTicketConfigs = await db.loadAllSupportTicketConfigs();
+        supportTicketConfigs.forEach(config => {
+            supportTicketConfig.set(config.guild_id, { 
+                channelId: config.channel_id, 
+                roleId: config.role_id 
+            });
+        });
+        console.log(`Loaded ${supportTicketConfigs.length} support ticket configurations`);
+
+        // Load ticket categories
+        const ticketCategoriesData = await db.loadAllTicketCategories();
+        ticketCategoriesData.forEach(category => {
+            ticketCategories.set(category.guild_id, {
+                setupCategoryId: category.setup_category_id,
+                supportCategoryId: category.support_category_id
+            });
+        });
+        console.log(`Loaded ${ticketCategoriesData.length} ticket category configurations`);
+
+        // Load open tickets
+        const openTicketsData = await db.loadAllOpenTickets();
+        openTicketsData.forEach(ticket => {
+            openTickets.set(ticket.user_id, {
+                channelId: ticket.channel_id,
+                ticketNumber: ticket.ticket_number,
+                randomNumber: ticket.random_number,
+                type: ticket.type
+            });
+        });
+        console.log(`Loaded ${openTicketsData.length} open tickets`);
+
+        // Load ticket counter
+        ticketCounter = await db.getTicketCounter();
+        console.log(`Loaded ticket counter: ${ticketCounter}`);
+
+    } catch (error) {
+        console.error('Error loading data from database:', error);
+        throw error;
+    }
 }
 
 // Helper function to get or create ticket categories
@@ -645,6 +754,20 @@ async function getOrCreateTicketCategory(guild, categoryType) {
             categories[`${categoryType}CategoryId`] = categoryId;
             ticketCategories.set(guildId, categories);
             
+            // Save to database
+            const dbCategories = await db.getTicketCategories(guildId);
+            if (dbCategories) {
+                const updateData = { ...dbCategories };
+                updateData[`${categoryType}_category_id`] = categoryId;
+                await db.saveTicketCategories(guildId, updateData.setup_category_id, updateData.support_category_id);
+            } else {
+                if (categoryType === 'setup') {
+                    await db.saveTicketCategories(guildId, categoryId, null);
+                } else {
+                    await db.saveTicketCategories(guildId, null, categoryId);
+                }
+            }
+            
             console.log(`Created ${categoryType} category: ${categoryName} (${categoryId})`);
         } catch (error) {
             console.error(`Failed to create ${categoryType} category:`, error);
@@ -665,7 +788,15 @@ async function restoreTicketCategories(guild) {
         ticketCategories.set(guildId, categories);
     }
     
-    // Check for existing categories
+    // Load categories from database
+    const dbCategories = await db.getTicketCategories(guildId);
+    if (dbCategories) {
+        categories.setupCategoryId = dbCategories.setup_category_id;
+        categories.supportCategoryId = dbCategories.support_category_id;
+        console.log(`Loaded categories from database for guild ${guildId}`);
+    }
+    
+    // Check for existing categories in Discord (fallback)
     const existingCategories = guild.channels.cache.filter(channel => 
         channel.type === ChannelType.GuildCategory && 
         (channel.name === '🟢 Zentro Setup Tickets' || channel.name === '🆘 Zentro Support Tickets')

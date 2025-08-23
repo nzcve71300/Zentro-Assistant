@@ -1,89 +1,73 @@
-# Discord Embed Bot
+# Zentro Discord Bot
 
-A Discord bot that creates rich embed messages with interactive customization options.
+A Discord bot with ticket system and embed creation capabilities.
 
 ## Features
 
-- **`/embed` command**: Creates a preview embed with three interactive buttons
-- **Edit Text Field**: Modal popup to customize title and description
-- **Edit Style**: Change embed color using hex codes
-- **Send Button**: Publishes the final embed to the channel
-- **Rich UI**: Beautiful buttons with emojis and proper styling
-- **Footer**: "Powered by Zentro" footer on all embeds
+- **Ticket System**: Create and manage support and setup tickets
+- **Embed Creator**: Interactive embed creation tool
+- **Database Persistence**: All configuration and ticket data is now stored in SQLite database
+- **Admin Commands**: Setup and manage ticket systems
 
-## Setup
+## Database Integration
 
-1. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+The bot now uses SQLite database to persist all configuration data, including:
 
-2. **Create a `.env` file** in the project root:
-   ```
-   TOKEN=your_discord_bot_token_here
-   CLIENT_ID=your_bot_client_id_here
-   ```
+- Ticket system configurations
+- Support ticket configurations  
+- Ticket categories
+- Open tickets
+- Ticket counter
 
-3. **Get your bot credentials**:
-   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
-   - Create a new application
-   - Go to the "Bot" section and copy the token
-   - Go to "General Information" and copy the Application ID (Client ID)
-   - Paste both in your `.env` file
+This ensures that all settings persist across bot restarts, solving the issue where the bot would forget `/setup-ticket` configurations.
 
-4. **Invite the bot to your server**:
-   - Go to OAuth2 > URL Generator
-   - Select "bot" scope
-   - Select permissions: Send Messages, Use Slash Commands
-   - Use the generated URL to invite the bot
+## Commands
 
-5. **Deploy slash commands**:
-   ```bash
-   node deploy-commands.js
-   ```
+### Admin Commands
+- `/setup-ticket <channel> <role>` - Set up the main ticket system
+- `/support-ticket-setup <channel> <role>` - Set up the support ticket system
+- `/ticket-close` - Close a ticket (usable in ticket channels)
 
-6. **Run the bot**:
-   ```bash
-   node index.js
-   ```
+### User Commands
+- `/embed` - Create and customize rich embeds
 
-## Usage
+## Installation
 
-1. Type `/embed` in any channel
-2. A preview embed will appear with three buttons:
-   - **Edit Text Field** (✏️): Opens a modal to edit title and description
-   - **Edit Style** (🎨): Opens a modal to change the embed color
-   - **Send Embed** (📤): Sends the final embed to the channel
+1. Install dependencies:
+```bash
+npm install
+```
 
-## Features in Detail
+2. Create a `.env` file with your bot token:
+```
+TOKEN=your_discord_bot_token_here
+```
 
-### Edit Text Field
-- Modal with title and description inputs
-- Placeholder text: "Enter embed title" and "Enter embed description"
-- Default values: "Embed Preview" and "This is a test"
-- Character limits: 256 for title, 4000 for description
+3. Deploy slash commands:
+```bash
+node deploy-commands.js
+```
 
-### Edit Style
-- Modal with color input field
-- Accepts hex color codes (e.g., #0099ff)
-- Validates hex format
-- Shows error message for invalid colors
+4. Run the bot:
+```bash
+node index.js
+```
 
-### Send Button
-- Publishes the embed to the channel
-- Includes "Powered by Zentro" footer
-- Clears temporary data after sending
+## Database
 
-## Technical Details
+The bot automatically creates a `bot_data.db` SQLite database file in the bot directory. This file contains all persistent data and should not be deleted.
 
-- Built with Discord.js v14
-- Uses ephemeral messages for previews
-- Temporary data storage (use database for production)
-- Proper error handling and validation
-- Modern Discord API features (buttons, modals, embeds)
+## Files
 
-## Requirements
+- `index.js` - Main bot file
+- `database.js` - Database management module
+- `deploy-commands.js` - Slash command deployment
+- `deploy-commands-guild.js` - Guild-specific command deployment
+- `bot_data.db` - SQLite database (created automatically)
 
-- Node.js 16.9.0 or higher
-- Discord.js 14.x
-- A Discord bot token 
+## Recent Changes
+
+- Added SQLite database integration
+- All ticket configurations now persist across bot restarts
+- Fixed issue where bot would forget `/setup-ticket` settings
+- Improved data management and reliability 
