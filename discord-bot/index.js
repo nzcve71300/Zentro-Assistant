@@ -6,7 +6,8 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
     ]
 });
 
@@ -57,6 +58,25 @@ client.on('ready', async () => {
     }
 });
 
+// Handle new member joins - automatically assign [ZENTRO]MEMBERS role
+client.on('guildMemberAdd', async member => {
+    if (member.guild.id !== ALLOWED_GUILD_ID) return;
+    
+    try {
+        // Find the [ZENTRO]MEMBERS role
+        const memberRole = member.guild.roles.cache.find(role => role.name === '[ZENTRO]MEMBERS');
+        
+        if (memberRole) {
+            await member.roles.add(memberRole);
+            console.log(`✅ Assigned [ZENTRO]MEMBERS role to ${member.user.tag}`);
+        } else {
+            console.log('⚠️ [ZENTRO]MEMBERS role not found. Please create it manually.');
+        }
+    } catch (error) {
+        console.error('Error assigning role to new member:', error);
+    }
+});
+
 client.on('interactionCreate', async interaction => {
     if (!isAllowedGuild(interaction)) {
         await interaction.reply({ content: 'This bot is only allowed in the official Zentro server.', ephemeral: true });
@@ -71,11 +91,46 @@ client.on('interactionCreate', async interaction => {
             await handleSupportTicketSetup(interaction);
         } else if (interaction.commandName === 'ticket-close') {
             await handleTicketClose(interaction);
+        } else if (interaction.commandName === 'send-role') {
+            await handleSendRole(interaction);
         }
     } else if (interaction.isButton()) {
         await handleButtonInteraction(interaction);
     } else if (interaction.isModalSubmit()) {
         await handleModalSubmit(interaction);
+    }
+});
+
+// Handle reaction add for role assignment
+client.on('messageReactionAdd', async (reaction, user) => {
+    if (user.bot) return;
+    
+    // Fetch the full reaction if it's partial
+    if (reaction.partial) {
+        try {
+            await reaction.fetch();
+        } catch (error) {
+            console.error('Error fetching reaction:', error);
+            return;
+        }
+    }
+    
+    // Check if this is the role assignment message
+    if (reaction.emoji.name === '⚙️') {
+        const guild = reaction.message.guild;
+        if (guild.id !== ALLOWED_GUILD_ID) return;
+        
+        try {
+            const member = await guild.members.fetch(user.id);
+            const memberRole = guild.roles.cache.find(role => role.name === '[ZENTRO]MEMBERS');
+            
+            if (memberRole && !member.roles.cache.has(memberRole.id)) {
+                await member.roles.add(memberRole);
+                console.log(`✅ Assigned [ZENTRO]MEMBERS role to ${user.tag} via reaction`);
+            }
+        } catch (error) {
+            console.error('Error assigning role via reaction:', error);
+        }
     }
 });
 
@@ -813,6 +868,49 @@ async function restoreTicketCategories(guild) {
     });
     
     ticketCategories.set(guildId, categories);
+}
+
+// Handle the /send-role command
+async function handleSendRole(interaction) {
+    try {
+        // Check if user has permission to manage roles
+        if (!interaction.member.permissions.has(PermissionFlagsBits.ManageRoles)) {
+            await interaction.reply({ 
+                content: '❌ You need the "Manage Roles" permission to use this command.', 
+                ephemeral: true 
+            });
+            return;
+        }
+
+        // Create the role assignment embed
+        const embed = new EmbedBuilder()
+            .setTitle('🎯 **Role Assignment**')
+            .setDescription('**Please react to obtain the Announcement role**\n\nClick the ⚙️ emoji below to get the **[ZENTRO]MEMBERS** role and stay updated with all our announcements!')
+            .setColor('#FFA500') // Orange color
+            .setTimestamp()
+            .setFooter({ 
+                text: 'Zentro • Role Assignment', 
+                iconURL: client.user.displayAvatarURL() 
+            });
+
+        // Send the embed
+        const message = await interaction.channel.send({ embeds: [embed] });
+        
+        // Add the gear emoji reaction
+        await message.react('⚙️');
+        
+        await interaction.reply({ 
+            content: '✅ Role assignment message sent successfully!', 
+            ephemeral: true 
+        });
+        
+    } catch (error) {
+        console.error('Error in handleSendRole:', error);
+        await interaction.reply({ 
+            content: '❌ An error occurred while sending the role assignment message.', 
+            ephemeral: true 
+        });
+    }
 }
 
 client.login(process.env.TOKEN); 

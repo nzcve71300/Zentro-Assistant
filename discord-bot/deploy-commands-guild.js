@@ -51,6 +51,11 @@ const commands = [
         name: 'ticket-close',
         description: 'Close the current ticket',
         defaultMemberPermissions: '0'
+    },
+    {
+        name: 'send-role',
+        description: 'Send a role assignment message with reaction',
+        defaultMemberPermissions: '0'
     }
 ];
 
