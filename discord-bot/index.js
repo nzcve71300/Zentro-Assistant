@@ -63,8 +63,8 @@ client.on('guildMemberAdd', async member => {
     if (member.guild.id !== ALLOWED_GUILD_ID) return;
     
     try {
-        // Find the [ZENTRO]MEMBERS role
-        const memberRole = member.guild.roles.cache.find(role => role.name === '[ZENTRO]MEMBERS');
+        // Find the [ZENTRO]MEMBERS role using the specific role ID
+        const memberRole = member.guild.roles.cache.get('1410772028876787794');
         
         if (memberRole) {
             await member.roles.add(memberRole);
@@ -74,6 +74,9 @@ client.on('guildMemberAdd', async member => {
         }
     } catch (error) {
         console.error('Error assigning role to new member:', error);
+        if (error.code === 50013) {
+            console.error('❌ Bot lacks permission to assign this role');
+        }
     }
 });
 
@@ -122,14 +125,48 @@ client.on('messageReactionAdd', async (reaction, user) => {
         
         try {
             const member = await guild.members.fetch(user.id);
-            const memberRole = guild.roles.cache.find(role => role.name === '[ZENTRO]MEMBERS');
+            const memberRole = guild.roles.cache.get('1410772028876787794'); // Use the specific role ID
             
-            if (memberRole && !member.roles.cache.has(memberRole.id)) {
-                await member.roles.add(memberRole);
-                console.log(`✅ Assigned [ZENTRO]MEMBERS role to ${user.tag} via reaction`);
+            if (!memberRole) {
+                console.error('❌ [ZENTRO]MEMBERS role not found!');
+                return;
             }
+            
+            if (member.roles.cache.has(memberRole.id)) {
+                console.log(`ℹ️ ${user.tag} already has the [ZENTRO]MEMBERS role`);
+                return;
+            }
+            
+            // Check if bot can manage this role
+            const botMember = guild.members.cache.get(client.user.id);
+            if (!botMember.permissions.has('ManageRoles')) {
+                console.error('❌ Bot does not have Manage Roles permission');
+                return;
+            }
+            
+            // Check role hierarchy
+            if (memberRole.position >= botMember.roles.highest.position) {
+                console.error('❌ Bot cannot assign role higher than its own role');
+                return;
+            }
+            
+            await member.roles.add(memberRole);
+            console.log(`✅ Assigned [ZENTRO]MEMBERS role to ${user.tag} via reaction`);
+            
+            // Send a DM to confirm (optional)
+            try {
+                await user.send('✅ You have been assigned the **[ZENTRO]MEMBERS** role! Welcome to the community!');
+            } catch (dmError) {
+                // User might have DMs disabled, that's okay
+            }
+            
         } catch (error) {
             console.error('Error assigning role via reaction:', error);
+            if (error.code === 50013) {
+                console.error('❌ Bot lacks permission to assign this role');
+            } else if (error.code === 50001) {
+                console.error('❌ Bot cannot access this user');
+            }
         }
     }
 });
