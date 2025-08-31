@@ -1,3 +1,7 @@
+// ⚠️ WARNING: This file is for GLOBAL commands only
+// Since this bot is guild-specific, use deploy-commands-guild.js instead
+// This file is kept for reference but should not be used to avoid duplicate commands
+
 const { REST, Routes } = require('discord.js');
 require('dotenv').config();
 
