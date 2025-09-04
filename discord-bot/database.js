@@ -200,6 +200,57 @@ class Database {
         });
     }
 
+    // Embed data methods
+    async saveEmbedData(userId, data) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT OR REPLACE INTO embed_data (user_id, title, description, color, timestamp, thumbnail, updated_at) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+                [userId, data.title, data.description, data.color, data.timestamp ? 1 : 0, data.thumbnail ? 1 : 0],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.lastID);
+                }
+            );
+        });
+    }
+
+    async getEmbedData(userId) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT * FROM embed_data WHERE user_id = ?',
+                [userId],
+                (err, row) => {
+                    if (err) reject(err);
+                    else if (row) {
+                        // Convert boolean values back
+                        resolve({
+                            title: row.title,
+                            description: row.description,
+                            color: row.color,
+                            timestamp: row.timestamp === 1,
+                            thumbnail: row.thumbnail === 1
+                        });
+                    } else {
+                        resolve(null);
+                    }
+                }
+            );
+        });
+    }
+
+    async deleteEmbedData(userId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'DELETE FROM embed_data WHERE user_id = ?',
+                [userId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.changes);
+                }
+            );
+        });
+    }
+
     // Ticket counter methods
     async getTicketCounter() {
         return new Promise((resolve, reject) => {
@@ -266,6 +317,18 @@ class Database {
         return new Promise((resolve, reject) => {
             this.db.all(
                 'SELECT * FROM open_tickets',
+                (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                }
+            );
+        });
+    }
+
+    async loadAllEmbedData() {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT * FROM embed_data',
                 (err, rows) => {
                     if (err) reject(err);
                     else resolve(rows);

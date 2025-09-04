@@ -469,13 +469,16 @@ async function handleButtonInteraction(interaction) {
 
 async function handleModalSubmit(interaction) {
     const userId = interaction.user.id;
-    const data = embedData.get(userId) || {
-        title: '🎯 **Embed Creator**',
-        description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
-        color: '#5865F2',
-        timestamp: true,
-        thumbnail: true
-    };
+    let data = await db.getEmbedData(userId);
+    if (!data) {
+        data = {
+            title: '🎯 **Embed Creator**',
+            description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
+            color: '#5865F2',
+            timestamp: true,
+            thumbnail: true
+        };
+    }
 
     if (interaction.customId === 'embed_text_modal') {
         const title = interaction.fields.getTextInputValue('embed_title');
@@ -484,6 +487,9 @@ async function handleModalSubmit(interaction) {
         data.title = title || '🎯 **Embed Creator**';
         data.description = description || 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support';
 
+        // Save embed data to database
+        await db.saveEmbedData(userId, data);
+        // Also update the local Map for immediate use
         embedData.set(userId, data);
 
         const embed = new EmbedBuilder()
@@ -531,6 +537,9 @@ async function handleModalSubmit(interaction) {
         }
 
         data.color = color;
+        // Save embed data to database
+        await db.saveEmbedData(userId, data);
+        // Also update the local Map for immediate use
         embedData.set(userId, data);
 
         const embed = new EmbedBuilder()
@@ -799,6 +808,19 @@ async function loadDataFromDatabase() {
         // Load ticket counter
         ticketCounter = await db.getTicketCounter();
         console.log(`Loaded ticket counter: ${ticketCounter}`);
+
+        // Load embed data
+        const embedDataArray = await db.loadAllEmbedData();
+        embedDataArray.forEach(embed => {
+            embedData.set(embed.user_id, {
+                title: embed.title,
+                description: embed.description,
+                color: embed.color,
+                timestamp: embed.timestamp === 1,
+                thumbnail: embed.thumbnail === 1
+            });
+        });
+        console.log(`Loaded ${embedDataArray.length} embed data entries`);
 
     } catch (error) {
         console.error('Error loading data from database:', error);
