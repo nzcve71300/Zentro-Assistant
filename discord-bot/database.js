@@ -65,6 +65,20 @@ class Database {
                 )
             `);
 
+            // Create reaction roles table
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS reaction_roles (
+                    guild_id    TEXT NOT NULL,
+                    channel_id  TEXT NOT NULL,
+                    message_id  TEXT NOT NULL,
+                    role_id     TEXT NOT NULL,
+                    emoji_id    TEXT,         -- for custom emojis
+                    emoji_name  TEXT,         -- for unicode or custom name
+                    is_unicode  INTEGER NOT NULL DEFAULT 0,
+                    UNIQUE (message_id, COALESCE(emoji_id, ''), COALESCE(emoji_name, ''))
+                )
+            `);
+
             // Create ticket counter table
             this.db.run(`
                 CREATE TABLE IF NOT EXISTS ticket_counter (
