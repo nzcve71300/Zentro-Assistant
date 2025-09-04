@@ -96,6 +96,8 @@ client.on('interactionCreate', async interaction => {
             await handleTicketClose(interaction);
         } else if (interaction.commandName === 'send-role') {
             await handleSendRole(interaction);
+        } else if (interaction.commandName === 'cleanup-tickets') {
+            await handleCleanupTickets(interaction);
         }
     } else if (interaction.isButton()) {
         await handleButtonInteraction(interaction);
@@ -1033,6 +1035,62 @@ async function handleSendRole(interaction) {
         await interaction.reply({ 
             content: '❌ An error occurred while sending the role assignment message.', 
             ephemeral: true 
+        });
+    }
+}
+
+// Handle the /cleanup-tickets command
+async function handleCleanupTickets(interaction) {
+    try {
+        // Only allow admins
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            await interaction.reply({ content: 'You need to be an administrator to use this command.', ephemeral: true });
+            return;
+        }
+
+        await interaction.deferReply({ ephemeral: true });
+
+        // Get all open tickets from database
+        const openTicketsData = await db.loadAllOpenTickets();
+        let cleanedCount = 0;
+        let validCount = 0;
+
+        for (const ticket of openTicketsData) {
+            try {
+                // Try to fetch the channel
+                const channel = await interaction.client.channels.fetch(ticket.channel_id);
+                if (channel) {
+                    validCount++;
+                    console.log(`✅ Valid ticket found: ${ticket.user_id} -> ${ticket.channel_id}`);
+                } else {
+                    // Channel doesn't exist, clean it up
+                    await db.deleteOpenTicket(ticket.user_id);
+                    openTickets.delete(ticket.user_id);
+                    cleanedCount++;
+                    console.log(`🧹 Cleaned up orphaned ticket: ${ticket.user_id} -> ${ticket.channel_id}`);
+                }
+            } catch (error) {
+                // Channel fetch failed, clean it up
+                await db.deleteOpenTicket(ticket.user_id);
+                openTickets.delete(ticket.user_id);
+                cleanedCount++;
+                console.log(`🧹 Cleaned up orphaned ticket: ${ticket.user_id} -> ${ticket.channel_id} (fetch failed)`);
+            }
+        }
+
+        await interaction.editReply({
+            content: `🧹 **Ticket Cleanup Complete!**\n\n` +
+                    `✅ **Valid Tickets:** ${validCount}\n` +
+                    `🧹 **Cleaned Up:** ${cleanedCount}\n\n` +
+                    `Total tickets processed: ${openTicketsData.length}`
+        });
+
+        console.log(`🎯 Ticket cleanup completed: ${validCount} valid, ${cleanedCount} cleaned up`);
+
+    } catch (error) {
+        console.error('❌ Error in handleCleanupTickets:', error);
+        await interaction.editReply({
+            content: '❌ An error occurred while cleaning up tickets. Check the console for details.'
         });
     }
 }

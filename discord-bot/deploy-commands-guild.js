@@ -56,6 +56,11 @@ const commands = [
         name: 'send-role',
         description: 'Send a role assignment message with reaction',
         defaultMemberPermissions: '0'
+    },
+    {
+        name: 'cleanup-tickets',
+        description: 'Clean up orphaned tickets (Admin only)',
+        defaultMemberPermissions: '0'
     }
 ];
 
