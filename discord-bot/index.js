@@ -1121,4 +1121,224 @@ async function handleCleanupTickets(interaction) {
     }
 }
 
+// Handle the /setup-rr command
+async function handleSetupRR(interaction) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+
+        const role = interaction.options.getRole('role', true);
+        const channel = interaction.options.getChannel('channel', true);
+        const text = interaction.options.getString('text', true);
+        const color = interaction.options.getString('color', true);
+        const emojiIn = interaction.options.getString('emoji', true);
+
+        // Basic permission checks
+        if (!channel || channel.type !== ChannelType.GuildText) {
+            return interaction.editReply('❌ Please pick a text channel.');
+        }
+        if (!interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageRoles)) {
+            return interaction.editReply('❌ I need **Manage Roles** permission.');
+        }
+        if (!interaction.guild.members.me.permissionsIn(channel).has(PermissionFlagsBits.SendMessages)) {
+            return interaction.editReply('❌ I can\'t send messages in that channel.');
+        }
+
+        // Parse emoji
+        const parsed = parseEmoji(emojiIn);
+        if (!parsed) {
+            return interaction.editReply('❌ Invalid emoji format. Use unicode (😎) or custom emoji from this server (<:name:id>).');
+        }
+
+        // Parse color
+        const colorInt = parseHexColor(color, 0x00ffff);
+
+        // Create embed
+        const embed = new EmbedBuilder()
+            .setTitle('🎭 Reaction Role')
+            .setDescription(text)
+            .setColor(colorInt)
+            .setFooter({ text: `React with ${parsed.isUnicode ? parsed.emojiName : `<:${parsed.emojiName}:${parsed.emojiId}>`} to get the ${role.name} role` })
+            .setTimestamp();
+
+        // Post the message
+        const msg = await channel.send({ embeds: [embed] });
+
+        // Add the reaction
+        try {
+            await msg.react(parsed.reactionIdentifier);
+        } catch (e) {
+            return interaction.editReply('❌ I couldn\'t add that emoji as a reaction. For custom emojis, use one from **this server**.');
+        }
+
+        // Save mapping
+        await db.insertReactionRole(
+            interaction.guild.id,
+            channel.id,
+            msg.id,
+            role.id,
+            parsed.emojiId,
+            parsed.emojiName,
+            parsed.isUnicode
+        );
+
+        await interaction.editReply(`✅ Reaction role set!\n• Channel: <#${channel.id}>\n• Role: <@&${role.id}>\n• Emoji: ${parsed.isUnicode ? parsed.emojiName : `<:${parsed.emojiName}:${parsed.emojiId}>`}\n\nUsers who react will get the role; removing the reaction removes the role.`);
+
+    } catch (err) {
+        console.error('/setup-rr error:', err);
+        await interaction.editReply('⚠️ Something went wrong setting up the reaction role.');
+    }
+}
+
+// Handle the /remove-rr command
+async function handleRemoveRR(interaction) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+
+        const messageId = interaction.options.getString('message_id', true);
+        const emojiIn = interaction.options.getString('emoji', true);
+
+        // Parse emoji
+        const parsed = parseEmoji(emojiIn);
+        if (!parsed) {
+            return interaction.editReply('❌ Invalid emoji format. Use unicode (😎) or custom emoji from this server (<:name:id>).');
+        }
+
+        // Find the mapping
+        const mapping = await db.findReactionRoleByMessageAndEmoji(
+            messageId,
+            parsed.isUnicode,
+            parsed.isUnicode ? parsed.emojiName : parsed.emojiId
+        );
+
+        if (!mapping) {
+            return interaction.editReply('❌ No reaction role found with that message ID and emoji.');
+        }
+
+        // Remove from database
+        await db.deleteReactionRole(messageId, parsed.emojiId, parsed.emojiName);
+
+        // Try to remove the reaction from the message
+        try {
+            const channel = await interaction.client.channels.fetch(mapping.channel_id);
+            if (channel) {
+                const message = await channel.messages.fetch(messageId);
+                if (message) {
+                    await message.reactions.cache.get(parsed.reactionIdentifier)?.remove();
+                }
+            }
+        } catch (e) {
+            console.log('Could not remove reaction from message (message may have been deleted)');
+        }
+
+        await interaction.editReply(`✅ Reaction role removed!\n• Role: <@&${mapping.role_id}>\n• Emoji: ${parsed.isUnicode ? parsed.emojiName : `<:${parsed.emojiName}:${parsed.emojiId}>`}`);
+
+    } catch (err) {
+        console.error('/remove-rr error:', err);
+        await interaction.editReply('⚠️ Something went wrong removing the reaction role.');
+    }
+}
+
+// Handle the /edit-rr command
+async function handleEditRR(interaction) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+
+        const messageId = interaction.options.getString('message_id', true);
+        const emojiIn = interaction.options.getString('emoji', true);
+        const newRole = interaction.options.getRole('new_role', true);
+        const newText = interaction.options.getString('new_text', true);
+        const newColor = interaction.options.getString('new_color', true);
+
+        // Parse emoji
+        const parsed = parseEmoji(emojiIn);
+        if (!parsed) {
+            return interaction.editReply('❌ Invalid emoji format. Use unicode (😎) or custom emoji from this server (<:name:id>).');
+        }
+
+        // Parse color
+        const colorInt = parseHexColor(newColor, 0x00ffff);
+
+        // Find the mapping
+        const mapping = await db.findReactionRoleByMessageAndEmoji(
+            messageId,
+            parsed.isUnicode,
+            parsed.isUnicode ? parsed.emojiName : parsed.emojiId
+        );
+
+        if (!mapping) {
+            return interaction.editReply('❌ No reaction role found with that message ID and emoji.');
+        }
+
+        // Update in database
+        const updated = await db.updateReactionRole(
+            messageId,
+            parsed.emojiId,
+            parsed.emojiName,
+            newRole.id,
+            newText,
+            newColor
+        );
+
+        if (!updated) {
+            return interaction.editReply('❌ Failed to update the reaction role.');
+        }
+
+        // Try to update the message
+        try {
+            const channel = await interaction.client.channels.fetch(mapping.channel_id);
+            if (channel) {
+                const message = await channel.messages.fetch(messageId);
+                if (message) {
+                    const newEmbed = new EmbedBuilder()
+                        .setTitle('🎭 Reaction Role')
+                        .setDescription(newText)
+                        .setColor(colorInt)
+                        .setFooter({ text: `React with ${parsed.isUnicode ? parsed.emojiName : `<:${parsed.emojiName}:${parsed.emojiId}>`} to get the ${newRole.name} role` })
+                        .setTimestamp();
+
+                    await message.edit({ embeds: [newEmbed] });
+                }
+            }
+        } catch (e) {
+            console.log('Could not update message (message may have been deleted)');
+        }
+
+        await interaction.editReply(`✅ Reaction role updated!\n• New Role: <@&${newRole.id}>\n• New Text: ${newText}\n• New Color: ${newColor}\n• Emoji: ${parsed.isUnicode ? parsed.emojiName : `<:${parsed.emojiName}:${parsed.emojiId}>`}`);
+
+    } catch (err) {
+        console.error('/edit-rr error:', err);
+        await interaction.editReply('⚠️ Something went wrong updating the reaction role.');
+    }
+}
+
+// Helper function to parse emoji
+function parseEmoji(input) {
+    // Custom emoji like <:name:id> or <a:name:id>
+    const custom = input.match(/^<a?:([a-zA-Z0-9_]+):(\d+)>$/);
+    if (custom) {
+        const [, name, id] = custom;
+        return {
+            isUnicode: false,
+            emojiId: id,
+            emojiName: name,
+            reactionIdentifier: input, // message.react accepts the full string for custom
+        };
+    }
+    // Otherwise treat as unicode
+    return {
+        isUnicode: true,
+        emojiId: null,
+        emojiName: input,
+        reactionIdentifier: input,
+    };
+}
+
+// Helper function to parse hex color
+function parseHexColor(hex, fallback = 0x00ffff) {
+    if (!hex) return fallback;
+    const cleaned = hex.replace(/^#/, '').trim();
+    if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return fallback;
+    return parseInt(cleaned, 16);
+}
+
 client.login(process.env.TOKEN); 
