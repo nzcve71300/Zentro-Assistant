@@ -76,7 +76,13 @@ class Database {
                     emoji_name  TEXT,         -- for unicode or custom name
                     is_unicode  INTEGER NOT NULL DEFAULT 0
                 )
-            `);
+            `, (err) => {
+                if (err) {
+                    console.error('❌ Error creating reaction_roles table:', err);
+                } else {
+                    console.log('✅ reaction_roles table created/verified successfully');
+                }
+            });
 
             // Create ticket counter table
             this.db.run(`
@@ -403,6 +409,8 @@ class Database {
     async findReactionRoleByMessageAndEmoji(messageId, isUnicode, emojiKey) {
         return new Promise((resolve, reject) => {
             try {
+                console.log(`🔍 Database query: messageId=${messageId}, isUnicode=${isUnicode}, emojiKey=${emojiKey}`);
+                
                 let stmt;
                 if (isUnicode) {
                     stmt = this.db.prepare(`
@@ -418,8 +426,10 @@ class Database {
                     `);
                 }
                 const row = stmt.get(messageId, emojiKey);
+                console.log(`🔍 Database result:`, row);
                 resolve(row);
             } catch (error) {
+                console.error(`❌ Database error in findReactionRoleByMessageAndEmoji:`, error);
                 reject(error);
             }
         });

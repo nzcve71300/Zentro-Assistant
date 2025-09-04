@@ -129,9 +129,16 @@ client.on('messageReactionAdd', async (reaction, user) => {
         }
         if (!reaction.message.guild) return;
 
+        console.log(`🔍 Reaction added: ${reaction.emoji.name || reaction.emoji.id} on message ${reaction.message.id}`);
+
         // Get reaction key
         const { isUnicode, key } = getReactionKey(reaction);
-        if (key == null) return;
+        if (key == null) {
+            console.log(`❌ Invalid reaction key for emoji: ${reaction.emoji.name || reaction.emoji.id}`);
+            return;
+        }
+
+        console.log(`🔍 Looking for reaction role mapping: messageId=${reaction.message.id}, isUnicode=${isUnicode}, key=${key}`);
 
         // Find the mapping
         const mapping = await db.findReactionRoleByMessageAndEmoji(
@@ -139,7 +146,13 @@ client.on('messageReactionAdd', async (reaction, user) => {
             isUnicode,
             key
         );
-        if (!mapping) return;
+        
+        if (!mapping) {
+            console.log(`❌ No reaction role mapping found for message ${reaction.message.id}`);
+            return;
+        }
+
+        console.log(`✅ Found mapping:`, mapping);
 
         const guild = reaction.message.guild;
         const member = await guild.members.fetch(user.id).catch(() => null);
