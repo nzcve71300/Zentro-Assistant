@@ -360,13 +360,10 @@ class Database {
 
     async loadAllEmbedData() {
         return new Promise((resolve, reject) => {
-            try {
-                const stmt = this.db.prepare('SELECT * FROM embed_data');
-                const rows = stmt.all();
-                resolve(rows);
-            } catch (error) {
-                reject(error);
-            }
+            this.db.all('SELECT * FROM embed_data', (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+            });
         });
     }
 
@@ -375,31 +372,37 @@ class Database {
         return new Promise((resolve, reject) => {
             try {
                 // First check if this combination already exists
-                const checkStmt = this.db.prepare(`
+                this.db.get(`
                     SELECT * FROM reaction_roles 
                     WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
-                `);
-                const existing = checkStmt.get(messageId, emojiId || '', emojiName || '');
-                
-                if (existing) {
-                    // Update existing record
-                    const updateStmt = this.db.prepare(`
-                        UPDATE reaction_roles 
-                        SET guild_id = ?, channel_id = ?, role_id = ?, is_unicode = ?
-                        WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
-                    `);
-                    const result = updateStmt.run(guildId, channelId, roleId, isUnicode ? 1 : 0, messageId, emojiId || '', emojiName || '');
-                    resolve(result);
-                } else {
-                    // Insert new record
-                    const insertStmt = this.db.prepare(`
-                        INSERT INTO reaction_roles
-                        (guild_id, channel_id, message_id, role_id, emoji_id, emoji_name, is_unicode)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    `);
-                    const result = insertStmt.run(guildId, channelId, messageId, roleId, emojiId, emojiName, isUnicode ? 1 : 0);
-                    resolve(result);
-                }
+                `, [messageId, emojiId || '', emojiName || ''], (err, existing) => {
+                    if (err) {
+                        reject(err);
+                        return;
+                    }
+                    
+                    if (existing) {
+                        // Update existing record
+                        this.db.run(`
+                            UPDATE reaction_roles 
+                            SET guild_id = ?, channel_id = ?, role_id = ?, is_unicode = ?
+                            WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
+                        `, [guildId, channelId, roleId, isUnicode ? 1 : 0, messageId, emojiId || '', emojiName || ''], function(err) {
+                            if (err) reject(err);
+                            else resolve(this);
+                        });
+                    } else {
+                        // Insert new record
+                        this.db.run(`
+                            INSERT INTO reaction_roles
+                            (guild_id, channel_id, message_id, role_id, emoji_id, emoji_name, is_unicode)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        `, [guildId, channelId, messageId, roleId, emojiId, emojiName, isUnicode ? 1 : 0], function(err) {
+                            if (err) reject(err);
+                            else resolve(this);
+                        });
+                    }
+                });
             } catch (error) {
                 reject(error);
             }
@@ -411,23 +414,35 @@ class Database {
             try {
                 console.log(`🔍 Database query: messageId=${messageId}, isUnicode=${isUnicode}, emojiKey=${emojiKey}`);
                 
-                let stmt;
                 if (isUnicode) {
-                    stmt = this.db.prepare(`
+                    this.db.get(`
                         SELECT * FROM reaction_roles
                         WHERE message_id = ? AND is_unicode = 1 AND emoji_name = ?
                         LIMIT 1
-                    `);
+                    `, [messageId, emojiKey], (err, row) => {
+                        if (err) {
+                            console.error(`❌ Database error:`, err);
+                            reject(err);
+                        } else {
+                            console.log(`🔍 Database result:`, row);
+                            resolve(row);
+                        }
+                    });
                 } else {
-                    stmt = this.db.prepare(`
+                    this.db.get(`
                         SELECT * FROM reaction_roles
                         WHERE message_id = ? AND is_unicode = 0 AND emoji_id = ?
                         LIMIT 1
-                    `);
+                    `, [messageId, emojiKey], (err, row) => {
+                        if (err) {
+                            console.error(`❌ Database error:`, err);
+                            reject(err);
+                        } else {
+                            console.log(`🔍 Database result:`, row);
+                            resolve(row);
+                        }
+                    });
                 }
-                const row = stmt.get(messageId, emojiKey);
-                console.log(`🔍 Database result:`, row);
-                resolve(row);
             } catch (error) {
                 console.error(`❌ Database error in findReactionRoleByMessageAndEmoji:`, error);
                 reject(error);
@@ -437,56 +452,51 @@ class Database {
 
     async getAllReactionRoles(guildId) {
         return new Promise((resolve, reject) => {
-            try {
-                const stmt = this.db.prepare('SELECT * FROM reaction_roles WHERE guild_id = ?');
-                const rows = stmt.all(guildId);
-                resolve(rows);
-            } catch (error) {
-                reject(error);
-            }
+            this.db.all('SELECT * FROM reaction_roles WHERE guild_id = ?', [guildId], (err, rows) => {
+                if (err) reject(err);
+                else resolve(rows);
+            });
         });
     }
 
     async deleteReactionRole(messageId, emojiId, emojiName) {
         return new Promise((resolve, reject) => {
-            try {
-                const stmt = this.db.prepare(`
-                    DELETE FROM reaction_roles 
-                    WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
-                `);
-                const result = stmt.run(messageId, emojiId || '', emojiName || '');
-                resolve(result);
-            } catch (error) {
-                reject(error);
-            }
+            this.db.run(`
+                DELETE FROM reaction_roles 
+                WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
+            `, [messageId, emojiId || '', emojiName || ''], function(err) {
+                if (err) reject(err);
+                else resolve(this);
+            });
         });
     }
 
     async updateReactionRole(messageId, emojiId, emojiName, newRoleId, newText, newColor) {
         return new Promise((resolve, reject) => {
-            try {
-                // First get the current mapping
-                const stmt = this.db.prepare(`
-                    SELECT * FROM reaction_roles 
-                    WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
-                `);
-                const current = stmt.get(messageId, emojiId || '', emojiName || '');
+            // First get the current mapping
+            this.db.get(`
+                SELECT * FROM reaction_roles 
+                WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
+            `, [messageId, emojiId || '', emojiName || ''], (err, current) => {
+                if (err) {
+                    reject(err);
+                    return;
+                }
                 
                 if (current) {
                     // Update the role
-                    const updateStmt = this.db.prepare(`
+                    this.db.run(`
                         UPDATE reaction_roles 
                         SET role_id = ? 
                         WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
-                    `);
-                    const result = updateStmt.run(newRoleId, messageId, emojiId || '', emojiName || '');
-                    resolve({ ...current, role_id: newRoleId, newText, newColor });
+                    `, [newRoleId, messageId, emojiId || '', emojiName || ''], function(err) {
+                        if (err) reject(err);
+                        else resolve({ ...current, role_id: newRoleId, newText, newColor });
+                    });
                 } else {
                     resolve(null);
                 }
-            } catch (error) {
-                reject(error);
-            }
+            });
         });
     }
 
