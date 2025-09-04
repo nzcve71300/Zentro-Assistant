@@ -74,8 +74,7 @@ class Database {
                     role_id     TEXT NOT NULL,
                     emoji_id    TEXT,         -- for custom emojis
                     emoji_name  TEXT,         -- for unicode or custom name
-                    is_unicode  INTEGER NOT NULL DEFAULT 0,
-                    UNIQUE (message_id, COALESCE(emoji_id, ''), COALESCE(emoji_name, ''))
+                    is_unicode  INTEGER NOT NULL DEFAULT 0
                 )
             `);
 
@@ -369,13 +368,32 @@ class Database {
     async insertReactionRole(guildId, channelId, messageId, roleId, emojiId, emojiName, isUnicode) {
         return new Promise((resolve, reject) => {
             try {
-                const stmt = this.db.prepare(`
-                    INSERT OR REPLACE INTO reaction_roles
-                    (guild_id, channel_id, message_id, role_id, emoji_id, emoji_name, is_unicode)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                // First check if this combination already exists
+                const checkStmt = this.db.prepare(`
+                    SELECT * FROM reaction_roles 
+                    WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
                 `);
-                const result = stmt.run(guildId, channelId, messageId, roleId, emojiId, emojiName, isUnicode ? 1 : 0);
-                resolve(result);
+                const existing = checkStmt.get(messageId, emojiId || '', emojiName || '');
+                
+                if (existing) {
+                    // Update existing record
+                    const updateStmt = this.db.prepare(`
+                        UPDATE reaction_roles 
+                        SET guild_id = ?, channel_id = ?, role_id = ?, is_unicode = ?
+                        WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
+                    `);
+                    const result = updateStmt.run(guildId, channelId, roleId, isUnicode ? 1 : 0, messageId, emojiId || '', emojiName || '');
+                    resolve(result);
+                } else {
+                    // Insert new record
+                    const insertStmt = this.db.prepare(`
+                        INSERT INTO reaction_roles
+                        (guild_id, channel_id, message_id, role_id, emoji_id, emoji_name, is_unicode)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    `);
+                    const result = insertStmt.run(guildId, channelId, messageId, roleId, emojiId, emojiName, isUnicode ? 1 : 0);
+                    resolve(result);
+                }
             } catch (error) {
                 reject(error);
             }
