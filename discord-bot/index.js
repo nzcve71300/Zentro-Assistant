@@ -809,18 +809,23 @@ async function loadDataFromDatabase() {
         ticketCounter = await db.getTicketCounter();
         console.log(`Loaded ticket counter: ${ticketCounter}`);
 
-        // Load embed data
-        const embedDataArray = await db.loadAllEmbedData();
-        embedDataArray.forEach(embed => {
-            embedData.set(embed.user_id, {
-                title: embed.title,
-                description: embed.description,
-                color: embed.color,
-                timestamp: embed.timestamp === 1,
-                thumbnail: embed.thumbnail === 1
+        // Load embed data (handle case where table might not exist yet)
+        try {
+            const embedDataArray = await db.loadAllEmbedData();
+            embedDataArray.forEach(embed => {
+                embedData.set(embed.user_id, {
+                    title: embed.title,
+                    description: embed.description,
+                    color: embed.color,
+                    timestamp: embed.timestamp === 1,
+                    thumbnail: embed.thumbnail === 1
+                });
             });
-        });
-        console.log(`Loaded ${embedDataArray.length} embed data entries`);
+            console.log(`Loaded ${embedDataArray.length} embed data entries`);
+        } catch (error) {
+            console.log('Embed data table not available yet, will be created on first use');
+            // This is normal for existing databases that don't have the embed_data table yet
+        }
 
     } catch (error) {
         console.error('Error loading data from database:', error);

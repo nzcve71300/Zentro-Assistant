@@ -51,6 +51,20 @@ class Database {
                 )
             `);
 
+            // Create embed data table
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS embed_data (
+                    user_id TEXT PRIMARY KEY,
+                    title TEXT,
+                    description TEXT,
+                    color TEXT,
+                    timestamp BOOLEAN DEFAULT 1,
+                    thumbnail BOOLEAN DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
             // Create ticket counter table
             this.db.run(`
                 CREATE TABLE IF NOT EXISTS ticket_counter (
