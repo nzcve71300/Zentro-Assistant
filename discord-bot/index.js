@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits, SlashCommandBuilder, ChannelType } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits, SlashCommandBuilder, ChannelType, Partials } = require('discord.js');
 require('dotenv').config();
 const Database = require('./database');
 
@@ -7,7 +7,13 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessageReactions
+    ],
+    partials: [
+        Partials.Channel,
+        Partials.Message,
+        Partials.Reaction
     ]
 });
 
@@ -112,72 +118,86 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// Handle reaction add for role assignment
+// Handle reaction role events
 client.on('messageReactionAdd', async (reaction, user) => {
-    if (user.bot) return;
-    
-    // Fetch the full reaction if it's partial
-    if (reaction.partial) {
-        try {
-            await reaction.fetch();
-        } catch (error) {
-            console.error('Error fetching reaction:', error);
-            return;
+    try {
+        if (user.bot) return;
+
+        // Ensure full objects
+        if (reaction.partial) {
+            try { await reaction.fetch(); } catch { return; }
         }
-    }
-    
-    // Check if this is the role assignment message
-    if (reaction.emoji.name === '⚙️') {
+        if (!reaction.message.guild) return;
+
+        // Get reaction key
+        const { isUnicode, key } = getReactionKey(reaction);
+        if (key == null) return;
+
+        // Find the mapping
+        const mapping = await db.findReactionRoleByMessageAndEmoji(
+            reaction.message.id,
+            isUnicode,
+            key
+        );
+        if (!mapping) return;
+
         const guild = reaction.message.guild;
-        if (guild.id !== ALLOWED_GUILD_ID) return;
-        
-        try {
-            const member = await guild.members.fetch(user.id);
-            const memberRole = guild.roles.cache.get('1410772028876787794'); // Use the specific role ID
-            
-            if (!memberRole) {
-                console.error('❌ [ZENTRO]MEMBERS role not found!');
-                return;
-            }
-            
-            if (member.roles.cache.has(memberRole.id)) {
-                console.log(`ℹ️ ${user.tag} already has the [ZENTRO]MEMBERS role`);
-                return;
-            }
-            
-            // Check if bot can manage this role
-            const botMember = guild.members.cache.get(client.user.id);
-            if (!botMember.permissions.has('ManageRoles')) {
-                console.error('❌ Bot does not have Manage Roles permission');
-                return;
-            }
-            
-            // Check role hierarchy
-            if (memberRole.position >= botMember.roles.highest.position) {
-                console.error('❌ Bot cannot assign role higher than its own role');
-                return;
-            }
-            
-            await member.roles.add(memberRole);
-            console.log(`✅ Assigned [ZENTRO]MEMBERS role to ${user.tag} via reaction`);
-            
-            // Send a DM to confirm (optional)
-            try {
-                await user.send('✅ You have been assigned the **[ZENTRO]MEMBERS** role! Welcome to the community!');
-            } catch (dmError) {
-                // User might have DMs disabled, that's okay
-            }
-            
-        } catch (error) {
-            console.error('Error assigning role via reaction:', error);
-            if (error.code === 50013) {
-                console.error('❌ Bot lacks permission to assign this role');
-            } else if (error.code === 50001) {
-                console.error('❌ Bot cannot access this user');
-            }
+        const member = await guild.members.fetch(user.id).catch(() => null);
+        if (!member) return;
+
+        // Add role
+        if (!member.roles.cache.has(mapping.role_id)) {
+            await member.roles.add(mapping.role_id).catch(() => {});
+            console.log(`✅ Added role ${mapping.role_id} to user ${user.id} via reaction`);
         }
+    } catch (e) {
+        console.error('MessageReactionAdd error:', e);
     }
 });
+
+client.on('messageReactionRemove', async (reaction, user) => {
+    try {
+        if (user.bot) return;
+
+        if (reaction.partial) {
+            try { await reaction.fetch(); } catch { return; }
+        }
+        if (!reaction.message.guild) return;
+
+        // Get reaction key
+        const { isUnicode, key } = getReactionKey(reaction);
+        if (key == null) return;
+
+        // Find the mapping
+        const mapping = await db.findReactionRoleByMessageAndEmoji(
+            reaction.message.id,
+            isUnicode,
+            key
+        );
+        if (!mapping) return;
+
+        const guild = reaction.message.guild;
+        const member = await guild.members.fetch(user.id).catch(() => null);
+        if (!member) return;
+
+        // Remove role
+        if (member.roles.cache.has(mapping.role_id)) {
+            await member.roles.remove(mapping.role_id).catch(() => {});
+            console.log(`❌ Removed role ${mapping.role_id} from user ${user.id} via reaction`);
+        }
+    } catch (e) {
+        console.error('MessageReactionRemove error:', e);
+    }
+});
+
+// Helper function to get reaction key
+function getReactionKey(reaction) {
+    if (!reaction.emoji) return { isUnicode: null, key: null };
+    if (reaction.emoji.id) {
+        return { isUnicode: false, key: reaction.emoji.id };
+    }
+    return { isUnicode: true, key: reaction.emoji.name };
+}
 
 async function handleEmbedCommand(interaction) {
     const embed = new EmbedBuilder()
