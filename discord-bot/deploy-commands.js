@@ -65,6 +65,100 @@ const commands = [
         name: 'cleanup-tickets',
         description: 'Clean up orphaned tickets (Admin only)',
         defaultMemberPermissions: '0'
+    },
+    {
+        name: 'setup-rr',
+        description: 'Create a reaction-role message that assigns a role when users react',
+        options: [
+            {
+                name: 'role',
+                description: 'Role to give/remove on reaction',
+                type: 8, // ROLE
+                required: true
+            },
+            {
+                name: 'channel',
+                description: 'Channel where the embed will be posted',
+                type: 7, // CHANNEL
+                required: true,
+                channel_types: [0] // GUILD_TEXT
+            },
+            {
+                name: 'text',
+                description: 'Embed description text',
+                type: 3, // STRING
+                required: true
+            },
+            {
+                name: 'color',
+                description: 'Embed color (hex, e.g. #00ffff)',
+                type: 3, // STRING
+                required: true
+            },
+            {
+                name: 'emoji',
+                description: 'Emoji to react with (unicode 😎 or custom <:name:id>)',
+                type: 3, // STRING
+                required: true
+            }
+        ],
+        defaultMemberPermissions: '0'
+    },
+    {
+        name: 'remove-rr',
+        description: 'Remove a reaction role from a message',
+        options: [
+            {
+                name: 'message_id',
+                description: 'ID of the message with the reaction role',
+                type: 3, // STRING
+                required: true
+            },
+            {
+                name: 'emoji',
+                description: 'Emoji to remove (unicode 😎 or custom <:name:id>)',
+                type: 3, // STRING
+                required: true
+            }
+        ],
+        defaultMemberPermissions: '0'
+    },
+    {
+        name: 'edit-rr',
+        description: 'Edit an existing reaction role',
+        options: [
+            {
+                name: 'message_id',
+                description: 'ID of the message with the reaction role',
+                type: 3, // STRING
+                required: true
+            },
+            {
+                name: 'emoji',
+                description: 'Emoji to edit (unicode 😎 or custom <:name:id>)',
+                type: 3, // STRING
+                required: true
+            },
+            {
+                name: 'new_role',
+                description: 'New role to assign',
+                type: 8, // ROLE
+                required: true
+            },
+            {
+                name: 'new_text',
+                description: 'New embed description text',
+                type: 3, // STRING
+                required: true
+            },
+            {
+                name: 'new_color',
+                description: 'New embed color (hex, e.g. #00ffff)',
+                type: 3, // STRING
+                required: true
+            }
+        ],
+        defaultMemberPermissions: '0'
     }
 ];
 

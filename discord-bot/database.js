@@ -341,13 +341,110 @@ class Database {
 
     async loadAllEmbedData() {
         return new Promise((resolve, reject) => {
-            this.db.all(
-                'SELECT * FROM embed_data',
-                (err, rows) => {
-                    if (err) reject(err);
-                    else resolve(rows);
+            try {
+                const stmt = this.db.prepare('SELECT * FROM embed_data');
+                const rows = stmt.all();
+                resolve(rows);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    // Reaction Role Methods
+    async insertReactionRole(guildId, channelId, messageId, roleId, emojiId, emojiName, isUnicode) {
+        return new Promise((resolve, reject) => {
+            try {
+                const stmt = this.db.prepare(`
+                    INSERT OR REPLACE INTO reaction_roles
+                    (guild_id, channel_id, message_id, role_id, emoji_id, emoji_name, is_unicode)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                `);
+                const result = stmt.run(guildId, channelId, messageId, roleId, emojiId, emojiName, isUnicode ? 1 : 0);
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    async findReactionRoleByMessageAndEmoji(messageId, isUnicode, emojiKey) {
+        return new Promise((resolve, reject) => {
+            try {
+                let stmt;
+                if (isUnicode) {
+                    stmt = this.db.prepare(`
+                        SELECT * FROM reaction_roles
+                        WHERE message_id = ? AND is_unicode = 1 AND emoji_name = ?
+                        LIMIT 1
+                    `);
+                } else {
+                    stmt = this.db.prepare(`
+                        SELECT * FROM reaction_roles
+                        WHERE message_id = ? AND is_unicode = 0 AND emoji_id = ?
+                        LIMIT 1
+                    `);
                 }
-            );
+                const row = stmt.get(messageId, emojiKey);
+                resolve(row);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    async getAllReactionRoles(guildId) {
+        return new Promise((resolve, reject) => {
+            try {
+                const stmt = this.db.prepare('SELECT * FROM reaction_roles WHERE guild_id = ?');
+                const rows = stmt.all(guildId);
+                resolve(rows);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    async deleteReactionRole(messageId, emojiId, emojiName) {
+        return new Promise((resolve, reject) => {
+            try {
+                const stmt = this.db.prepare(`
+                    DELETE FROM reaction_roles 
+                    WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
+                `);
+                const result = stmt.run(messageId, emojiId || '', emojiName || '');
+                resolve(result);
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    async updateReactionRole(messageId, emojiId, emojiName, newRoleId, newText, newColor) {
+        return new Promise((resolve, reject) => {
+            try {
+                // First get the current mapping
+                const stmt = this.db.prepare(`
+                    SELECT * FROM reaction_roles 
+                    WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
+                `);
+                const current = stmt.get(messageId, emojiId || '', emojiName || '');
+                
+                if (current) {
+                    // Update the role
+                    const updateStmt = this.db.prepare(`
+                        UPDATE reaction_roles 
+                        SET role_id = ? 
+                        WHERE message_id = ? AND emoji_id = ? AND emoji_name = ?
+                    `);
+                    const result = updateStmt.run(newRoleId, messageId, emojiId || '', emojiName || '');
+                    resolve({ ...current, role_id: newRoleId, newText, newColor });
+                } else {
+                    resolve(null);
+                }
+            } catch (error) {
+                reject(error);
+            }
         });
     }
 

@@ -98,6 +98,12 @@ client.on('interactionCreate', async interaction => {
             await handleSendRole(interaction);
         } else if (interaction.commandName === 'cleanup-tickets') {
             await handleCleanupTickets(interaction);
+        } else if (interaction.commandName === 'setup-rr') {
+            await handleSetupRR(interaction);
+        } else if (interaction.commandName === 'remove-rr') {
+            await handleRemoveRR(interaction);
+        } else if (interaction.commandName === 'edit-rr') {
+            await handleEditRR(interaction);
         }
     } else if (interaction.isButton()) {
         await handleButtonInteraction(interaction);
