@@ -233,105 +233,165 @@ async function handleButtonInteraction(interaction) {
             await interaction.reply({ content: 'Ticket system is not configured. Please ask an admin to run /setup-ticket.', ephemeral: true });
             return;
         }
-        // Create private ticket channel
-        const guild = interaction.guild;
-        const staffRole = config.role_id;
-        const ticketNumber = await db.getTicketCounter();
-        await db.incrementTicketCounter();
-        const randomNumber = Math.floor(Math.random() * 1000000);
-        const channelName = `🟢| ${userId}${randomNumber}`;
         
-        // Get or create setup category
-        const categoryId = await getOrCreateTicketCategory(guild, 'setup');
+        // Check if user already has an open ticket
+        const existingTicket = await db.getOpenTicket(userId);
+        if (existingTicket) {
+            await interaction.reply({ 
+                content: `You already have an open ticket: <#${existingTicket.channel_id}>\nPlease close your existing ticket before opening a new one.`, 
+                ephemeral: true 
+            });
+            return;
+        }
         
-        const ticketChannel = await guild.channels.create({
-            name: channelName,
-            type: ChannelType.GuildText,
-            parent: categoryId, // Place channel under the category
-            permissionOverwrites: [
-                { id: guild.roles.everyone, deny: ['ViewChannel'] },
-                { id: userId, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] },
-                { id: staffRole, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] }
-            ]
-        });
-        
-        // Save ticket to database
-        await db.saveOpenTicket(userId, ticketChannel.id, ticketNumber, randomNumber, 'setup');
-        openTickets.set(userId, { channelId: ticketChannel.id, ticketNumber, randomNumber, type: 'setup' });
-        // Orange embed with instructions
-        const embed = new EmbedBuilder()
-            .setTitle('THANK YOU FOR PURCHASING ZENTRO BOT!')
-            .setDescription('Zentro staff will answer your ticket as soon as possible.\n\n**Submit your setup info:**\n- An invite link to your discord server.\n- Your payment account email.\n\n**Legal Information**\nYou can view our terms of service:\n<https://discord.com/channels/1385691441967267953/1385760938220716172>')
-            .setColor(orange)
-            .setThumbnail('https://cdn.discordapp.com/attachments/1390084651057418352/1402975345941942344/Zentro-picture.png.png?ex=6895de1c&is=68948c9c&hm=fee1cf71e083a86406b8a90c2bf9f7035d07115c8962cf0ea2c7b9aed1455444&')
-            .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() });
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('zentro_submit_info')
-                    .setLabel('Submit Information')
-                    .setStyle(ButtonStyle.Primary)
-            );
-        await ticketChannel.send({ content: `<@${userId}> <@&${staffRole}>`, embeds: [embed], components: [row] });
-        // Ephemeral message in original channel
-        await interaction.reply({
-            content: `You have successfully opened a ticket here: <#${ticketChannel.id}>\n🟢 ticket number:${ticketNumber}`,
-            ephemeral: true
-        });
+        try {
+            // Create private ticket channel
+            const guild = interaction.guild;
+            const staffRole = config.role_id;
+            const ticketNumber = await db.getTicketCounter();
+            await db.incrementTicketCounter();
+            const randomNumber = Math.floor(Math.random() * 1000000);
+            const channelName = `🟢| ${userId}${randomNumber}`;
+            
+            // Get or create setup category
+            const categoryId = await getOrCreateTicketCategory(guild, 'setup');
+            if (!categoryId) {
+                await interaction.reply({ 
+                    content: 'Failed to create ticket category. Please contact an administrator.', 
+                    ephemeral: true 
+                });
+                return;
+            }
+            
+            const ticketChannel = await guild.channels.create({
+                name: channelName,
+                type: ChannelType.GuildText,
+                parent: categoryId, // Place channel under the category
+                permissionOverwrites: [
+                    { id: guild.roles.everyone, deny: ['ViewChannel'] },
+                    { id: userId, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] },
+                    { id: staffRole, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] }
+                ]
+            });
+            
+            // Save ticket to database
+            await db.saveOpenTicket(userId, ticketChannel.id, ticketNumber, randomNumber, 'setup');
+            openTickets.set(userId, { channelId: ticketChannel.id, ticketNumber, randomNumber, type: 'setup' });
+            
+            // Orange embed with instructions
+            const embed = new EmbedBuilder()
+                .setTitle('THANK YOU FOR PURCHASING ZENTRO BOT!')
+                .setDescription('Zentro staff will answer your ticket as soon as possible.\n\n**Submit your setup info:**\n- An invite link to your discord server.\n- Your payment account email.\n\n**Legal Information**\nYou can view our terms of service:\n<https://discord.com/channels/1385691441967267953/1385760938220716172>')
+                .setColor(orange)
+                .setThumbnail('https://cdn.discordapp.com/attachments/1390084651057418352/1402975345941942344/Zentro-picture.png.png?ex=6895de1c&is=68948c9c&hm=fee1cf71e083a86406b8a90c2bf9f7035d07115c8962cf0ea2c7b9aed1455444&')
+                .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() });
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('zentro_submit_info')
+                        .setLabel('Submit Information')
+                        .setStyle(ButtonStyle.Primary)
+                );
+            await ticketChannel.send({ content: `<@${userId}> <@&${staffRole}>`, embeds: [embed], components: [row] });
+            
+            // Ephemeral message in original channel
+            await interaction.reply({
+                content: `You have successfully opened a ticket here: <#${ticketChannel.id}>\n🟢 ticket number:${ticketNumber}`,
+                ephemeral: true
+            });
+            
+            console.log(`✅ Setup ticket created successfully for user ${userId}: ${ticketChannel.id}`);
+            
+        } catch (error) {
+            console.error('❌ Error creating setup ticket:', error);
+            await interaction.reply({ 
+                content: 'An error occurred while creating your ticket. Please try again or contact an administrator.', 
+                ephemeral: true 
+            });
+        }
     } else if (interaction.customId === 'support_ticket') {
         if (!supportConfig) {
             await interaction.reply({ content: 'Support ticket system is not configured. Please ask an admin to run /support-ticket-setup.', ephemeral: true });
             return;
         }
-        // Create private support ticket channel
-        const guild = interaction.guild;
-        const staffRole = supportConfig.role_id;
-        const ticketNumber = await db.getTicketCounter();
-        await db.incrementTicketCounter();
-        const randomNumber = Math.floor(Math.random() * 1000000);
-        const channelName = `🟢| ${userId}${randomNumber}`;
         
-        // Get or create support category
-        const categoryId = await getOrCreateTicketCategory(guild, 'support');
+        // Check if user already has an open ticket
+        const existingTicket = await db.getOpenTicket(userId);
+        if (existingTicket) {
+            await interaction.reply({ 
+                content: `You already have an open ticket: <#${existingTicket.channel_id}>\nPlease close your existing ticket before opening a new one.`, 
+                ephemeral: true 
+            });
+            return;
+        }
         
-        const ticketChannel = await guild.channels.create({
-            name: channelName,
-            type: ChannelType.GuildText,
-            parent: categoryId, // Place channel under the category
-            permissionOverwrites: [
-                { id: guild.roles.everyone, deny: ['ViewChannel'] },
-                { id: userId, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] },
-                { id: staffRole, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] }
-            ]
-        });
-        
-        // Save ticket to database
-        await db.saveOpenTicket(userId, ticketChannel.id, ticketNumber, randomNumber, 'support');
-        openTickets.set(userId, { channelId: ticketChannel.id, ticketNumber, randomNumber, type: 'support' });
-        
-        // Send initial message with submit button
-        const embed = new EmbedBuilder()
-            .setTitle('🎫 Support Ticket Opened')
-            .setDescription(`Hello <@${userId}>, please enter a detailed description of what's happening by pressing the submit button below. This will help us solve your problem much faster!`)
-            .setColor(orange)
-            .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() });
-        
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('support_submit_description')
-                    .setLabel('Submit Description')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('📝')
-            );
-        
-        await ticketChannel.send({ content: `<@${userId}> <@&${staffRole}>`, embeds: [embed], components: [row] });
-        
-        // Ephemeral message in original channel
-        await interaction.reply({
-            content: `You have successfully opened a support ticket here: <#${ticketChannel.id}>\n🟢 ticket number:${ticketNumber}`,
-            ephemeral: true
-        });
+        try {
+            // Create private support ticket channel
+            const guild = interaction.guild;
+            const staffRole = supportConfig.role_id;
+            const ticketNumber = await db.getTicketCounter();
+            await db.incrementTicketCounter();
+            const randomNumber = Math.floor(Math.random() * 1000000);
+            const channelName = `🟢| ${userId}${randomNumber}`;
+            
+            // Get or create support category
+            const categoryId = await getOrCreateTicketCategory(guild, 'support');
+            if (!categoryId) {
+                await interaction.reply({ 
+                    content: 'Failed to create ticket category. Please contact an administrator.', 
+                    ephemeral: true 
+                });
+                return;
+            }
+            
+            const ticketChannel = await guild.channels.create({
+                name: channelName,
+                type: ChannelType.GuildText,
+                parent: categoryId, // Place channel under the category
+                permissionOverwrites: [
+                    { id: guild.roles.everyone, deny: ['ViewChannel'] },
+                    { id: userId, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] },
+                    { id: staffRole, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] }
+                ]
+            });
+            
+            // Save ticket to database
+            await db.saveOpenTicket(userId, ticketChannel.id, ticketNumber, randomNumber, 'support');
+            openTickets.set(userId, { channelId: ticketChannel.id, ticketNumber, randomNumber, type: 'support' });
+            
+            // Send initial message with submit button
+            const embed = new EmbedBuilder()
+                .setTitle('🎫 Support Ticket Opened')
+                .setDescription(`Hello <@${userId}>, please enter a detailed description of what's happening by pressing the submit button below. This will help us solve your problem much faster!`)
+                .setColor(orange)
+                .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() });
+            
+            const row = new ActionRowBuilder()
+                .addComponents(
+                    new ButtonBuilder()
+                        .setCustomId('support_submit_description')
+                        .setLabel('Submit Description')
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji('📝')
+                );
+            
+            await ticketChannel.send({ content: `<@${userId}> <@&${staffRole}>`, embeds: [embed], components: [row] });
+            
+            // Ephemeral message in original channel
+            await interaction.reply({
+                content: `You have successfully opened a support ticket here: <#${ticketChannel.id}>\n🟢 ticket number:${ticketNumber}`,
+                ephemeral: true
+            });
+            
+            console.log(`✅ Support ticket created successfully for user ${userId}: ${ticketChannel.id}`);
+            
+        } catch (error) {
+            console.error('❌ Error creating support ticket:', error);
+            await interaction.reply({ 
+                content: 'An error occurred while creating your ticket. Please try again or contact an administrator.', 
+                ephemeral: true 
+            });
+        }
     } else if (interaction.customId === 'zentro_purchase') {
         const orange = 0xFFA500;
         const embed = new EmbedBuilder()
