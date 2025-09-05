@@ -31,6 +31,7 @@ const ticketCategories = new Map(); // guildId -> { setupCategoryId, supportCate
 let ticketCounter = 1;
 
 const ALLOWED_GUILD_ID = '1385691441967267953';
+const ADMIN_ROLE_NAME = '[ZENTRO]Assistant';
 
 client.on('guildCreate', guild => {
     if (guild.id !== ALLOWED_GUILD_ID) {
@@ -89,6 +90,15 @@ client.on('guildMemberAdd', async member => {
 client.on('interactionCreate', async interaction => {
     if (!isAllowedGuild(interaction)) {
         await interaction.reply({ content: 'This bot is only allowed in the official Zentro server.', ephemeral: true });
+        return;
+    }
+    
+    // Check for admin role on all slash commands
+    if (interaction.isChatInputCommand() && !hasAdminRole(interaction)) {
+        await interaction.reply({ 
+            content: `❌ You need the **${ADMIN_ROLE_NAME}** role to use bot commands.`, 
+            ephemeral: true 
+        });
         return;
     }
     if (interaction.isChatInputCommand()) {
@@ -837,6 +847,11 @@ async function handleTicketClose(interaction) {
 
 function isAllowedGuild(interaction) {
     return interaction.guildId === ALLOWED_GUILD_ID;
+}
+
+function hasAdminRole(interaction) {
+    if (!interaction.member) return false;
+    return interaction.member.roles.cache.some(role => role.name === ADMIN_ROLE_NAME);
 }
 
 // Function to convert color names to hex codes

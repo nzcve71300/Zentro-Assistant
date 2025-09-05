@@ -50,22 +50,26 @@ const commands = [
                 required: true
             }
         ],
-        defaultMemberPermissions: '0'
+        defaultMemberPermissions: '0',
+        dmPermission: false
     },
     {
         name: 'ticket-close',
         description: 'Close the current ticket',
-        defaultMemberPermissions: '0'
+        defaultMemberPermissions: '0',
+        dmPermission: false
     },
     {
         name: 'send-role',
         description: 'Send a role assignment message with reaction',
-        defaultMemberPermissions: '0'
+        defaultMemberPermissions: '0',
+        dmPermission: false
     },
     {
         name: 'cleanup-tickets',
         description: 'Clean up orphaned tickets (Admin only)',
-        defaultMemberPermissions: '0'
+        defaultMemberPermissions: '0',
+        dmPermission: false
     },
     {
         name: 'setup-rr',
@@ -103,7 +107,8 @@ const commands = [
                 required: true
             }
         ],
-        defaultMemberPermissions: '0'
+        defaultMemberPermissions: '0',
+        dmPermission: false
     },
     {
         name: 'remove-rr',
@@ -122,7 +127,8 @@ const commands = [
                 required: true
             }
         ],
-        defaultMemberPermissions: '0'
+        defaultMemberPermissions: '0',
+        dmPermission: false
     },
     {
         name: 'edit-rr',
@@ -159,7 +165,8 @@ const commands = [
                 required: true
             }
         ],
-        defaultMemberPermissions: '0'
+        defaultMemberPermissions: '0',
+        dmPermission: false
     },
     {
         name: 'link-thread',
@@ -197,7 +204,8 @@ const commands = [
                 required: false
             }
         ],
-        defaultMemberPermissions: '8192' // MANAGE_MESSAGES
+        defaultMemberPermissions: '0',
+        dmPermission: false
     }
 ];
 
@@ -206,6 +214,7 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 (async () => {
     try {
         console.log('Started refreshing guild (/) commands.');
+        console.log('⚠️  Note: Commands are restricted to users with the [ZENTRO]Assistant role');
 
         await rest.put(
             Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID),
@@ -214,7 +223,8 @@ const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
         console.log('Successfully reloaded guild (/) commands.');
         console.log('Commands will be available immediately in your guild!');
+        console.log('🔐 All commands now require the [ZENTRO]Assistant role');
     } catch (error) {
         console.error(error);
     }
-})(); 
+})();
