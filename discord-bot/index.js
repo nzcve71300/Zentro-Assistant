@@ -110,6 +110,8 @@ client.on('interactionCreate', async interaction => {
             await handleRemoveRR(interaction);
         } else if (interaction.commandName === 'edit-rr') {
             await handleEditRR(interaction);
+        } else if (interaction.commandName === 'link-thread') {
+            await handleLinkThread(interaction);
         }
     } else if (interaction.isButton()) {
         await handleButtonInteraction(interaction);
@@ -1346,8 +1348,54 @@ function parseEmoji(input) {
     };
 }
 
+// Handle the /link-thread command
+async function handleLinkThread(interaction) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+
+        const url = interaction.options.getString("thread_url", true).trim();
+        const channel = interaction.options.getChannel("channel", true);
+        const label = interaction.options.getString("label") || "Click for info";
+        const text = interaction.options.getString("text") || null;
+        const color = parseHexColor(interaction.options.getString("color") || "#2b2d31");
+
+        // Validate thread URL format
+        const valid = /https?:\/\/(?:(?:ptb|canary)\.)?discord\.com\/channels\/\d+\/\d+/.test(url);
+        if (!valid) {
+            return interaction.editReply("❌ That doesn't look like a valid thread link. Right-click the thread → **Copy Link** and paste it here.");
+        }
+
+        // Check bot permissions in target channel
+        const me = interaction.guild.members.me;
+        if (!me.permissionsIn(channel).has(PermissionFlagsBits.SendMessages)) {
+            return interaction.editReply("❌ I can't send messages in that channel. Please adjust channel permissions.");
+        }
+
+        // Create the button
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setStyle(ButtonStyle.Link)
+                .setLabel(label)
+                .setURL(url)
+        );
+
+        // Create the message payload
+        const payload = text
+            ? { embeds: [new EmbedBuilder().setDescription(text).setColor(color)], components: [row] }
+            : { content: " ", components: [row] };
+
+        // Send the message
+        const sent = await channel.send(payload);
+        await interaction.editReply(`✅ Posted in <#${channel.id}> • [Jump to message](${sent.url})`);
+
+    } catch (err) {
+        console.error('/link-thread error:', err);
+        await interaction.editReply('⚠️ Something went wrong creating the thread link.');
+    }
+}
+
 // Helper function to parse hex color
-function parseHexColor(hex, fallback = 0x00ffff) {
+function parseHexColor(hex, fallback = 0x2b2d31) {
     if (!hex) return fallback;
     const cleaned = hex.replace(/^#/, '').trim();
     if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return fallback;

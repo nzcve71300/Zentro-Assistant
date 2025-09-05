@@ -159,6 +159,44 @@ const commands = [
             }
         ],
         defaultMemberPermissions: '0'
+    },
+    {
+        name: 'link-thread',
+        description: 'Post a button that opens a specific thread',
+        options: [
+            {
+                name: 'thread_url',
+                description: 'Paste the thread link (Right-click thread → Copy Link)',
+                type: 3, // STRING
+                required: true
+            },
+            {
+                name: 'channel',
+                description: 'Where to post the button',
+                type: 7, // CHANNEL
+                required: true,
+                channel_types: [0, 5] // GUILD_TEXT, GUILD_ANNOUNCEMENT
+            },
+            {
+                name: 'label',
+                description: 'Button text (default: Click for info)',
+                type: 3, // STRING
+                required: false
+            },
+            {
+                name: 'text',
+                description: 'Optional embed text above the button',
+                type: 3, // STRING
+                required: false
+            },
+            {
+                name: 'color',
+                description: 'Embed color hex (e.g. #00ffff)',
+                type: 3, // STRING
+                required: false
+            }
+        ],
+        defaultMemberPermissions: '8192' // MANAGE_MESSAGES
     }
 ];
 
