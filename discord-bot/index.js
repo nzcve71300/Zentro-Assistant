@@ -310,6 +310,26 @@ async function isTicketOrPromotionChannel(channel) {
     return false;
 }
 
+// Handle new forum posts - auto-react with ⬆️ emoji
+client.on('threadCreate', async thread => {
+    // Only handle threads in the allowed guild
+    if (thread.guildId !== ALLOWED_GUILD_ID) return;
+    
+    // Check if this thread is in the promotion forum channel
+    if (thread.parentId === PROMOTION_CHANNEL_ID) {
+        try {
+            // React with ⬆️ emoji to the first message in the thread
+            const firstMessage = await thread.fetchStarterMessage();
+            if (firstMessage) {
+                await firstMessage.react('⬆️');
+                console.log(`✅ Auto-reacted to new forum post: ${thread.name} in promotion channel`);
+            }
+        } catch (error) {
+            console.error('Error auto-reacting to forum post:', error);
+        }
+    }
+});
+
 async function handleEmbedCommand(interaction) {
     const embed = new EmbedBuilder()
         .setTitle('🎯 **Embed Creator**')
