@@ -32,6 +32,7 @@ let ticketCounter = 1;
 
 const ALLOWED_GUILD_ID = '1385691441967267953';
 const ADMIN_ROLE_NAME = '[ZENTRO]Assistant';
+const PROMOTION_CHANNEL_ID = '1405989727152242718';
 
 client.on('guildCreate', guild => {
     if (guild.id !== ALLOWED_GUILD_ID) {
@@ -222,6 +223,78 @@ function getReactionKey(reaction) {
         return { isUnicode: false, key: reaction.emoji.id };
     }
     return { isUnicode: true, key: reaction.emoji.name };
+}
+
+// Handle message events for link blocking
+client.on('messageCreate', async message => {
+    // Ignore bot messages and messages from other guilds
+    if (message.author.bot || message.guildId !== ALLOWED_GUILD_ID) return;
+    
+    // Check if the message contains a link
+    const linkRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/gi;
+    const hasLink = linkRegex.test(message.content);
+    
+    if (hasLink) {
+        // Check if this is a ticket channel or promotion channel
+        const isTicketChannel = await isTicketOrPromotionChannel(message.channel);
+        
+        if (!isTicketChannel) {
+            // Block the link - delete the message and send warning
+            try {
+                await message.delete();
+                
+                // Create warning embed
+                const warningEmbed = new EmbedBuilder()
+                    .setTitle('🚫 Link Blocked')
+                    .setDescription(`Hello ${message.author}, Please don't send links in this channel. Use the promotion channel <#${PROMOTION_CHANNEL_ID}>`)
+                    .setColor('#FF0000')
+                    .setTimestamp()
+                    .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() });
+                
+                // Send warning message
+                const warningMessage = await message.channel.send({ embeds: [warningEmbed] });
+                
+                // Delete the warning message after 10 seconds
+                setTimeout(async () => {
+                    try {
+                        await warningMessage.delete();
+                    } catch (error) {
+                        console.error('Failed to delete warning message:', error);
+                    }
+                }, 10000);
+                
+                console.log(`🚫 Blocked link from ${message.author.tag} in channel ${message.channel.name}`);
+                
+            } catch (error) {
+                console.error('Error blocking link:', error);
+            }
+        }
+    }
+});
+
+// Helper function to check if a channel is a ticket channel or promotion channel
+async function isTicketOrPromotionChannel(channel) {
+    // Check if it's the promotion channel
+    if (channel.id === PROMOTION_CHANNEL_ID) {
+        return true;
+    }
+    
+    // Check if it's a ticket channel by looking for open tickets
+    const ticket = await db.getOpenTicketByChannel(channel.id);
+    if (ticket) {
+        return true;
+    }
+    
+    // Check if it's in a ticket category
+    const guildId = channel.guildId;
+    const categories = ticketCategories.get(guildId);
+    if (categories && channel.parentId) {
+        if (channel.parentId === categories.setupCategoryId || channel.parentId === categories.supportCategoryId) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 async function handleEmbedCommand(interaction) {
