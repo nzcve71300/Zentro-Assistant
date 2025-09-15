@@ -109,28 +109,28 @@ async function sendWelcomeMessage(member) {
         const memberCount = member.guild.memberCount;
         const orange = 0xFFA500;
         
-        // Create a stunning welcome embed
+        // Create a clean horizontal welcome embed
         const welcomeEmbed = new EmbedBuilder()
-            .setTitle('🎉 **WELCOME TO ZENTRO!** 🎉')
-            .setDescription(`**Hey there, ${member.user}!** 👋\n\n🌟 **You are our ${memberCount}${getOrdinalSuffix(memberCount)} member!** 🌟\n\nWelcome to the **ZENTRO** community! We're thrilled to have you join our amazing server. Get ready for an incredible experience with our premium Discord bot!`)
+            .setTitle('**WELCOME TO ZENTRO**')
+            .setDescription(`**Hey there, ${member.user}!**\n\n**You are our ${memberCount}${getOrdinalSuffix(memberCount)} member!**\n\nWelcome to the **ZENTRO** community! We're thrilled to have you join our amazing server. Get ready for an incredible experience with our premium Discord bot!`)
             .setColor(orange)
             .setThumbnail('https://i.imgur.com/Wl2DxPD.png')
             .setImage('https://i.imgur.com/Wl2DxPD.png')
             .addFields(
                 {
-                    name: '🛒 **Get Started**',
-                    value: `[**Buy or Setup Zentro**](https://discord.com/channels/1385691441967267953/1385758548276809748)\n[**Read Terms of Service**](https://discord.com/channels/1385691441967267953/1385760938220716172)`,
-                    inline: true
+                    name: '**Get Started**',
+                    value: `[Buy or Setup Zentro](https://discord.com/channels/1385691441967267953/1385758548276809748) • [Read Terms of Service](https://discord.com/channels/1385691441967267953/1385760938220716172)`,
+                    inline: false
                 },
                 {
-                    name: '🆘 **Support & Help**',
-                    value: `[**Get Support**](https://discord.com/channels/1385691441967267953/1404579611945209927)\n[**Helpful Information**](https://discord.com/channels/1385691441967267953/1401677636085878907)`,
-                    inline: true
+                    name: '**Support & Help**',
+                    value: `[Get Support](https://discord.com/channels/1385691441967267953/1404579611945209927) • [Helpful Information](https://discord.com/channels/1385691441967267953/1401677636085878907)`,
+                    inline: false
                 },
                 {
-                    name: '📢 **Stay Updated**',
-                    value: `[**Latest Updates**](https://discord.com/channels/1385691441967267953/1385692719245955254)\n[**Bot Updates**](https://discord.com/channels/1385691441967267953/1401323995684667502)`,
-                    inline: true
+                    name: '**Stay Updated**',
+                    value: `[Latest Updates](https://discord.com/channels/1385691441967267953/1385692719245955254) • [Bot Updates](https://discord.com/channels/1385691441967267953/1401323995684667502)`,
+                    inline: false
                 }
             )
             .setFooter({ 
@@ -139,41 +139,47 @@ async function sendWelcomeMessage(member) {
             })
             .setTimestamp();
         
-        // Create action buttons for quick navigation
-        const row = new ActionRowBuilder()
-            .addComponents(
-                new ButtonBuilder()
-                    .setCustomId('welcome_buy_setup')
-                    .setLabel('🛒 Buy/Setup')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('🛒'),
-                new ButtonBuilder()
-                    .setCustomId('welcome_support')
-                    .setLabel('🆘 Support')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('🆘'),
-                new ButtonBuilder()
-                    .setCustomId('welcome_updates')
-                    .setLabel('📢 Updates')
-                    .setStyle(ButtonStyle.Success)
-                    .setEmoji('📢'),
-                new ButtonBuilder()
-                    .setCustomId('welcome_info')
-                    .setLabel('ℹ️ Info')
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji('ℹ️')
-            );
-        
         await welcomeChannel.send({ 
-            content: `🎉 **${member.user}** just joined the server! Welcome to Zentro! 🎉`,
-            embeds: [welcomeEmbed],
-            components: [row]
+            content: `**${member.user}** just joined the server! Welcome to Zentro!`,
+            embeds: [welcomeEmbed]
         });
+        
+        // Send DM welcome message
+        await sendDMWelcomeMessage(member, memberCount);
         
         console.log(`🎉 Sent welcome message for ${member.user.tag} (Member #${memberCount})`);
         
     } catch (error) {
         console.error('Error sending welcome message:', error);
+    }
+}
+
+// Send DM welcome message
+async function sendDMWelcomeMessage(member, memberCount) {
+    try {
+        const orange = 0xFFA500;
+        
+        const dmEmbed = new EmbedBuilder()
+            .setTitle('**Welcome to Zentro!**')
+            .setDescription(`**Hello ${member.user.username}!**\n\nThank you for joining the **ZENTRO** community! We are absolutely thrilled to have you become a part of our amazing server.\n\nAs our **${memberCount}${getOrdinalSuffix(memberCount)} member**, you are joining an incredible community of Discord server owners and bot enthusiasts who are passionate about creating the best possible experience for their users.\n\nWe hope you will have an absolutely wonderful time here and that you find everything you need to make your Discord server truly exceptional. Our team is always here to support you on your journey!\n\n**Welcome aboard, and enjoy your stay!**`)
+            .setColor(orange)
+            .setThumbnail('https://i.imgur.com/Wl2DxPD.png')
+            .setImage('https://i.imgur.com/Wl2DxPD.png')
+            .setFooter({ 
+                text: 'Zentro • Premium Discord Bot', 
+                iconURL: client.user.displayAvatarURL() 
+            })
+            .setTimestamp();
+        
+        await member.send({ embeds: [dmEmbed] });
+        console.log(`📩 Sent DM welcome to ${member.user.tag}`);
+        
+    } catch (error) {
+        console.error('Error sending DM welcome message:', error);
+        // Don't log if user has DMs disabled
+        if (error.code !== 50007) {
+            console.log(`Could not send DM to ${member.user.tag} (DMs may be disabled)`);
+        }
     }
 }
 
@@ -788,26 +794,6 @@ async function handleButtonInteraction(interaction) {
         
         await interaction.channel.send({ embeds: [embed] });
         await interaction.reply({ content: '✅ Embed sent successfully!', ephemeral: true });
-    } else if (interaction.customId === 'welcome_buy_setup') {
-        await interaction.reply({ 
-            content: '🛒 **Get Started with Zentro!**\n\n[**Buy or Setup Zentro**](https://discord.com/channels/1385691441967267953/1385758548276809748)\n[**Read Terms of Service**](https://discord.com/channels/1385691441967267953/1385760938220716172)', 
-            ephemeral: true 
-        });
-    } else if (interaction.customId === 'welcome_support') {
-        await interaction.reply({ 
-            content: '🆘 **Need Help?**\n\n[**Get Support**](https://discord.com/channels/1385691441967267953/1404579611945209927)\n[**Helpful Information**](https://discord.com/channels/1385691441967267953/1401677636085878907)', 
-            ephemeral: true 
-        });
-    } else if (interaction.customId === 'welcome_updates') {
-        await interaction.reply({ 
-            content: '📢 **Stay Updated!**\n\n[**Latest Updates**](https://discord.com/channels/1385691441967267953/1385692719245955254)\n[**Bot Updates**](https://discord.com/channels/1385691441967267953/1401323995684667502)', 
-            ephemeral: true 
-        });
-    } else if (interaction.customId === 'welcome_info') {
-        await interaction.reply({ 
-            content: 'ℹ️ **Welcome to Zentro!**\n\nWe\'re glad you joined our community! Use the buttons above to navigate to different sections of our server.\n\n**Quick Links:**\n• 🛒 Buy/Setup Zentro\n• 🆘 Get Support\n• 📢 Check Updates\n• ℹ️ Server Information', 
-            ephemeral: true 
-        });
     }
 }
 
