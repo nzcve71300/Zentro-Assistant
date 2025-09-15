@@ -233,7 +233,6 @@ client.on('messageCreate', async message => {
     // First check if this is a ticket channel or promotion channel - if so, allow all links
     const isAllowedChannel = await isTicketOrPromotionChannel(message.channel);
     if (isAllowedChannel) {
-        console.log(`✅ Link allowed in channel ${message.channel.name} (${message.channel.id})`);
         return; // Allow all messages in ticket/promotion channels
     }
     
@@ -262,7 +261,14 @@ client.on('messageCreate', async message => {
                 try {
                     await warningMessage.delete();
                 } catch (error) {
-                    console.error('Failed to delete warning message:', error);
+                    // Ignore "Unknown Message" errors (message was already deleted)
+                    if (error.code === 10008 || error.message === 'Unknown Message') {
+                        console.log('Warning message was already deleted by user/moderator');
+                    } else if (error.code === 'ChannelNotCached') {
+                        console.log('Channel not cached when trying to delete warning message');
+                    } else {
+                        console.error('Failed to delete warning message:', error);
+                    }
                 }
             }, 10000);
             
@@ -276,18 +282,14 @@ client.on('messageCreate', async message => {
 
 // Helper function to check if a channel is a ticket channel or promotion channel
 async function isTicketOrPromotionChannel(channel) {
-    console.log(`🔍 Checking channel: ${channel.name} (${channel.id})`);
-    
     // Check if it's the promotion channel
     if (channel.id === PROMOTION_CHANNEL_ID) {
-        console.log(`✅ Promotion channel detected: ${channel.id}`);
         return true;
     }
     
     // Check if it's a ticket channel by looking for open tickets
     const ticket = await db.getOpenTicketByChannel(channel.id);
     if (ticket) {
-        console.log(`✅ Ticket channel detected: ${channel.id}`);
         return true;
     }
     
@@ -295,14 +297,11 @@ async function isTicketOrPromotionChannel(channel) {
     const guildId = channel.guildId;
     const categories = ticketCategories.get(guildId);
     if (categories && channel.parentId) {
-        console.log(`🔍 Checking categories - Setup: ${categories.setupCategoryId}, Support: ${categories.supportCategoryId}, Channel Parent: ${channel.parentId}`);
         if (channel.parentId === categories.setupCategoryId || channel.parentId === categories.supportCategoryId) {
-            console.log(`✅ Ticket category channel detected: ${channel.id}`);
             return true;
         }
     }
     
-    console.log(`❌ Channel not allowed for links: ${channel.id}`);
     return false;
 }
 
