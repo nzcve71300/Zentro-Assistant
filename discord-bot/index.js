@@ -282,8 +282,13 @@ client.on('messageCreate', async message => {
 
 // Helper function to check if a channel is a ticket channel or promotion channel
 async function isTicketOrPromotionChannel(channel) {
-    // Check if it's the promotion channel
+    // Check if it's the promotion channel (forum channel)
     if (channel.id === PROMOTION_CHANNEL_ID) {
+        return true;
+    }
+    
+    // Check if it's a forum post inside the promotion forum channel
+    if (channel.parentId === PROMOTION_CHANNEL_ID) {
         return true;
     }
     
