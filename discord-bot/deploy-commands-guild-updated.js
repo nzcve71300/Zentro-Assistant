@@ -227,6 +227,26 @@ const commands = [
         ],
         defaultMemberPermissions: '0',
         dmPermission: false
+    },
+    {
+        name: 'g-create',
+        description: 'Create a new giveaway (Admin only)',
+        defaultMemberPermissions: '0',
+        dmPermission: false
+    },
+    {
+        name: 'g-close',
+        description: 'Force close a giveaway (Admin only)',
+        options: [
+            {
+                name: 'message_id',
+                description: 'The message ID of the giveaway to close',
+                type: 3, // STRING
+                required: true
+            }
+        ],
+        defaultMemberPermissions: '0',
+        dmPermission: false
     }
 ];
 

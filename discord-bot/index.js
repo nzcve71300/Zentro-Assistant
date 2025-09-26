@@ -263,6 +263,10 @@ client.on('interactionCreate', async interaction => {
             await handleLinkThread(interaction);
         } else if (interaction.commandName === 'setup-zentro-ticket') {
             await handleSetupZentoTicket(interaction);
+        } else if (interaction.commandName === 'g-create') {
+            await handleGiveawayCreate(interaction);
+        } else if (interaction.commandName === 'g-close') {
+            await handleGiveawayClose(interaction);
         }
     } else if (interaction.isButton()) {
         await handleButtonInteraction(interaction);
@@ -920,6 +924,9 @@ async function handleButtonInteraction(interaction) {
     } else if (interaction.customId === 'close_zentro_ticket') {
         // Handle close ticket button
         await handleCloseZentoTicket(interaction);
+    } else if (interaction.customId.startsWith('enter_giveaway_')) {
+        // Handle giveaway entry button
+        await handleGiveawayEntry(interaction);
     }
 }
 
@@ -1065,6 +1072,12 @@ async function handleModalSubmit(interaction) {
         const email = interaction.fields.getTextInputValue('verify_email');
         const purchaseItem = interaction.fields.getTextInputValue('verify_purchase_item');
         await createZentoTicket(interaction, 'verify', { email, purchaseItem });
+    } else if (interaction.customId === 'giveaway_create_modal') {
+        const name = interaction.fields.getTextInputValue('giveaway_name');
+        const description = interaction.fields.getTextInputValue('giveaway_description');
+        const time = interaction.fields.getTextInputValue('giveaway_time');
+        const maxWinners = interaction.fields.getTextInputValue('giveaway_max_winners');
+        await createGiveaway(interaction, { name, description, time, maxWinners });
     }
 }
 
@@ -2140,6 +2153,409 @@ async function getOrCreateZentoTicketCategory(guild, ticketType, categoryName, c
     } catch (error) {
         console.error(`Failed to create Zentro category:`, error);
         return null;
+    }
+}
+
+// Giveaway System Functions
+
+// Handle /g-create command
+async function handleGiveawayCreate(interaction) {
+    try {
+        // Only allow admins
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            await interaction.reply({ content: 'You need to be an administrator to use this command.', ephemeral: true });
+            return;
+        }
+
+        // Create modal for giveaway creation
+        const modal = new ModalBuilder()
+            .setCustomId('giveaway_create_modal')
+            .setTitle('Create Giveaway');
+
+        const nameInput = new TextInputBuilder()
+            .setCustomId('giveaway_name')
+            .setLabel('Giveaway Name')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Enter the giveaway name...')
+            .setRequired(true)
+            .setMaxLength(100);
+
+        const descriptionInput = new TextInputBuilder()
+            .setCustomId('giveaway_description')
+            .setLabel('Giveaway Description')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Enter the giveaway description...')
+            .setRequired(true)
+            .setMaxLength(1000);
+
+        const timeInput = new TextInputBuilder()
+            .setCustomId('giveaway_time')
+            .setLabel('Giveaway Duration (e.g., 1h, 30m, 2d)')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('1h, 30m, 2d, etc.')
+            .setRequired(true);
+
+        const maxWinnersInput = new TextInputBuilder()
+            .setCustomId('giveaway_max_winners')
+            .setLabel('Maximum Winners')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('1, 2, 3, etc.')
+            .setRequired(true);
+
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(nameInput),
+            new ActionRowBuilder().addComponents(descriptionInput),
+            new ActionRowBuilder().addComponents(timeInput),
+            new ActionRowBuilder().addComponents(maxWinnersInput)
+        );
+
+        await interaction.showModal(modal);
+
+    } catch (error) {
+        console.error('Error in handleGiveawayCreate:', error);
+        await interaction.reply({ 
+            content: 'An error occurred while creating the giveaway modal.', 
+            ephemeral: true 
+        });
+    }
+}
+
+// Create giveaway from modal data
+async function createGiveaway(interaction, data) {
+    try {
+        const { name, description, time, maxWinners } = data;
+        
+        // Parse time
+        const endTime = parseTime(time);
+        if (!endTime) {
+            await interaction.reply({ 
+                content: 'Invalid time format. Use formats like: 1m, 30m, 1h, 2h, 1d, 3d', 
+                ephemeral: true 
+            });
+            return;
+        }
+
+        // Validate max winners
+        const maxWinnersNum = parseInt(maxWinners);
+        if (isNaN(maxWinnersNum) || maxWinnersNum < 1 || maxWinnersNum > 100) {
+            await interaction.reply({ 
+                content: 'Invalid number of winners. Please enter a number between 1 and 100.', 
+                ephemeral: true 
+            });
+            return;
+        }
+
+        // Create giveaway embed
+        const orange = 0xFFA500;
+        const embed = new EmbedBuilder()
+            .setTitle(`**${name}**`)
+            .setDescription(`**${description}**`)
+            .setColor(orange)
+            .addFields(
+                { name: '**Time Remaining**', value: `<t:${Math.floor(endTime / 1000)}:R>`, inline: false },
+                { name: '**Max Winners**', value: maxWinnersNum.toString(), inline: false },
+                { name: '**Entrants**', value: '0', inline: false }
+            )
+            .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() })
+            .setTimestamp();
+
+        // Create entry button
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId(`enter_giveaway_${Date.now()}`)
+                    .setLabel('Enter Giveaway')
+                    .setStyle(ButtonStyle.Primary)
+            );
+
+        // Send giveaway message
+        const message = await interaction.channel.send({ embeds: [embed], components: [row] });
+
+        // Save to database
+        await db.saveGiveaway(
+            message.id,
+            interaction.guildId,
+            interaction.channel.id,
+            interaction.user.id,
+            name,
+            description,
+            maxWinnersNum,
+            endTime
+        );
+
+        // Start countdown
+        startGiveawayCountdown(message.id, endTime);
+
+        await interaction.reply({ 
+            content: `Giveaway created successfully! [Jump to giveaway](${message.url})`, 
+            ephemeral: true 
+        });
+
+        console.log(`✅ Giveaway created: ${name} by ${interaction.user.tag} in ${interaction.guild.name}`);
+
+    } catch (error) {
+        console.error('Error creating giveaway:', error);
+        await interaction.reply({ 
+            content: 'An error occurred while creating the giveaway.', 
+            ephemeral: true 
+        });
+    }
+}
+
+// Handle /g-close command
+async function handleGiveawayClose(interaction) {
+    try {
+        // Only allow admins
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            await interaction.reply({ content: 'You need to be an administrator to use this command.', ephemeral: true });
+            return;
+        }
+
+        const messageId = interaction.options.getString('message_id');
+        
+        // Get giveaway from database
+        const giveaway = await db.getGiveaway(messageId);
+        if (!giveaway) {
+            await interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
+            return;
+        }
+
+        // Check if giveaway is in the same guild
+        if (giveaway.guild_id !== interaction.guildId) {
+            await interaction.reply({ content: 'This giveaway is not in this server.', ephemeral: true });
+            return;
+        }
+
+        // End the giveaway
+        await endGiveaway(messageId, true);
+
+        await interaction.reply({ 
+            content: 'Giveaway has been forcefully closed.', 
+            ephemeral: true 
+        });
+
+    } catch (error) {
+        console.error('Error in handleGiveawayClose:', error);
+        await interaction.reply({ 
+            content: 'An error occurred while closing the giveaway.', 
+            ephemeral: true 
+        });
+    }
+}
+
+// Handle giveaway entry button
+async function handleGiveawayEntry(interaction) {
+    try {
+        const giveawayId = interaction.customId.replace('enter_giveaway_', '');
+        const messageId = interaction.message.id;
+        
+        // Get giveaway from database
+        const giveaway = await db.getGiveaway(messageId);
+        if (!giveaway) {
+            await interaction.reply({ content: 'Giveaway not found.', ephemeral: true });
+            return;
+        }
+
+        // Check if giveaway is still active
+        if (giveaway.status !== 'active') {
+            await interaction.reply({ content: 'This giveaway has ended.', ephemeral: true });
+            return;
+        }
+
+        // Check if giveaway has ended
+        if (Date.now() > giveaway.end_time) {
+            await endGiveaway(messageId, false);
+            await interaction.reply({ content: 'This giveaway has ended.', ephemeral: true });
+            return;
+        }
+
+        // Add entry
+        const result = await db.addGiveawayEntry(messageId, interaction.user.id, interaction.guildId);
+        
+        if (result === 0) {
+            await interaction.reply({ content: 'You have already entered this giveaway!', ephemeral: true });
+            return;
+        }
+
+        // Update embed with new entry count
+        await updateGiveawayEmbed(interaction.message);
+
+        await interaction.reply({ content: 'You have successfully entered the giveaway!', ephemeral: true });
+
+    } catch (error) {
+        console.error('Error in handleGiveawayEntry:', error);
+        await interaction.reply({ 
+            content: 'An error occurred while entering the giveaway.', 
+            ephemeral: true 
+        });
+    }
+}
+
+// Parse time string (1m, 1h, 1d format)
+function parseTime(timeStr) {
+    const time = timeStr.toLowerCase().trim();
+    const match = time.match(/^(\d+)([mhd])$/);
+    
+    if (!match) return null;
+    
+    const value = parseInt(match[1]);
+    const unit = match[2];
+    
+    let milliseconds = 0;
+    switch (unit) {
+        case 'm':
+            milliseconds = value * 60 * 1000;
+            break;
+        case 'h':
+            milliseconds = value * 60 * 60 * 1000;
+            break;
+        case 'd':
+            milliseconds = value * 24 * 60 * 60 * 1000;
+            break;
+        default:
+            return null;
+    }
+    
+    // Maximum 30 days
+    if (milliseconds > 30 * 24 * 60 * 60 * 1000) {
+        return null;
+    }
+    
+    return Date.now() + milliseconds;
+}
+
+// Start giveaway countdown
+function startGiveawayCountdown(messageId, endTime) {
+    const timeUntilEnd = endTime - Date.now();
+    
+    setTimeout(async () => {
+        await endGiveaway(messageId, false);
+    }, timeUntilEnd);
+}
+
+// End giveaway and select winners
+async function endGiveaway(messageId, forceClose = false) {
+    try {
+        const giveaway = await db.getGiveaway(messageId);
+        if (!giveaway || giveaway.status !== 'active') return;
+
+        // Update status
+        await db.updateGiveawayStatus(messageId, 'ended');
+
+        // Get entries
+        const entries = await db.getGiveawayEntries(messageId);
+        
+        if (entries.length === 0) {
+            // No entries
+            const embed = new EmbedBuilder()
+                .setTitle(`**${giveaway.name}**`)
+                .setDescription(`**${giveaway.description}**`)
+                .setColor(0xFF0000)
+                .addFields(
+                    { name: '**Status**', value: 'Ended', inline: false },
+                    { name: '**Winners**', value: 'No entries', inline: false },
+                    { name: '**Entrants**', value: '0', inline: false }
+                )
+                .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() })
+                .setTimestamp();
+
+            // Update message
+            const channel = await client.channels.fetch(giveaway.channel_id);
+            if (channel) {
+                const message = await channel.messages.fetch(messageId);
+                if (message) {
+                    await message.edit({ embeds: [embed], components: [] });
+                }
+            }
+            return;
+        }
+
+        // Select random winners
+        const winners = selectRandomWinners(entries, giveaway.max_winners);
+        
+        // Create winner embed
+        const orange = 0xFFA500;
+        const embed = new EmbedBuilder()
+            .setTitle(`**${giveaway.name}**`)
+            .setDescription(`**${giveaway.description}**`)
+            .setColor(orange)
+            .addFields(
+                { name: '**Status**', value: 'Ended', inline: false },
+                { name: '**Winners**', value: winners.map(w => `<@${w.user_id}>`).join(', '), inline: false },
+                { name: '**Entrants**', value: entries.length.toString(), inline: false }
+            )
+            .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() })
+            .setTimestamp();
+
+        // Update message
+        const channel = await client.channels.fetch(giveaway.channel_id);
+        if (channel) {
+            const message = await channel.messages.fetch(messageId);
+            if (message) {
+                await message.edit({ embeds: [embed], components: [] });
+                
+                // Send winner announcement
+                const winnerMention = winners.map(w => `<@${w.user_id}>`).join(' ');
+                await channel.send(`**Congratulations to the winners of "${giveaway.name}"!**\n\n${winnerMention}`);
+            }
+        }
+
+        // Send DMs to winners
+        for (const winner of winners) {
+            try {
+                const user = await client.users.fetch(winner.user_id);
+                const dmEmbed = new EmbedBuilder()
+                    .setTitle('Congratulations!')
+                    .setDescription(`You have won the giveaway **"${giveaway.name}"** in ${channel.guild.name}!\n\n**Prize:** ${giveaway.description}\n\nCongratulations on your win!`)
+                    .setColor(orange)
+                    .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() })
+                    .setTimestamp();
+                
+                await user.send({ embeds: [dmEmbed] });
+            } catch (error) {
+                console.error(`Failed to send DM to winner ${winner.user_id}:`, error);
+            }
+        }
+
+        console.log(`✅ Giveaway ended: ${giveaway.name} - ${winners.length} winners selected`);
+
+    } catch (error) {
+        console.error('Error ending giveaway:', error);
+    }
+}
+
+// Select random winners
+function selectRandomWinners(entries, maxWinners) {
+    const shuffled = [...entries].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, Math.min(maxWinners, entries.length));
+}
+
+// Update giveaway embed with current entry count
+async function updateGiveawayEmbed(message) {
+    try {
+        const giveaway = await db.getGiveaway(message.id);
+        if (!giveaway) return;
+
+        const entries = await db.getGiveawayEntries(message.id);
+        const entryCount = entries.length;
+
+        const orange = 0xFFA500;
+        const embed = new EmbedBuilder()
+            .setTitle(`**${giveaway.name}**`)
+            .setDescription(`**${giveaway.description}**`)
+            .setColor(orange)
+            .addFields(
+                { name: '**Time Remaining**', value: `<t:${Math.floor(giveaway.end_time / 1000)}:R>`, inline: false },
+                { name: '**Max Winners**', value: giveaway.max_winners.toString(), inline: false },
+                { name: '**Entrants**', value: entryCount.toString(), inline: false }
+            )
+            .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() })
+            .setTimestamp();
+
+        await message.edit({ embeds: [embed] });
+
+    } catch (error) {
+        console.error('Error updating giveaway embed:', error);
     }
 }
 

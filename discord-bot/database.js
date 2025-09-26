@@ -132,6 +132,34 @@ class Database {
             this.db.run(`
                 INSERT OR IGNORE INTO zentro_ticket_counter (id, counter) VALUES (1, 1)
             `);
+
+            // Create giveaways table
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS giveaways (
+                    message_id TEXT PRIMARY KEY,
+                    guild_id TEXT NOT NULL,
+                    channel_id TEXT NOT NULL,
+                    creator_id TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    max_winners INTEGER NOT NULL,
+                    end_time INTEGER NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    status TEXT DEFAULT 'active'
+                )
+            `);
+
+            // Create giveaway entries table
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS giveaway_entries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    giveaway_id TEXT NOT NULL,
+                    user_id TEXT NOT NULL,
+                    guild_id TEXT NOT NULL,
+                    entered_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(giveaway_id, user_id)
+                )
+            `);
         });
     }
 
@@ -661,6 +689,123 @@ class Database {
                 (err, rows) => {
                     if (err) reject(err);
                     else resolve(rows);
+                }
+            );
+        });
+    }
+
+    // Giveaway Methods
+    async saveGiveaway(messageId, guildId, channelId, creatorId, name, description, maxWinners, endTime) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT OR REPLACE INTO giveaways (message_id, guild_id, channel_id, creator_id, name, description, max_winners, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                [messageId, guildId, channelId, creatorId, name, description, maxWinners, endTime],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.lastID);
+                }
+            );
+        });
+    }
+
+    async getGiveaway(messageId) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT * FROM giveaways WHERE message_id = ?',
+                [messageId],
+                (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                }
+            );
+        });
+    }
+
+    async getAllActiveGiveaways() {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT * FROM giveaways WHERE status = "active"',
+                (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                }
+            );
+        });
+    }
+
+    async updateGiveawayStatus(messageId, status) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'UPDATE giveaways SET status = ? WHERE message_id = ?',
+                [status, messageId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.changes);
+                }
+            );
+        });
+    }
+
+    async addGiveawayEntry(giveawayId, userId, guildId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT OR IGNORE INTO giveaway_entries (giveaway_id, user_id, guild_id) VALUES (?, ?, ?)',
+                [giveawayId, userId, guildId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.changes);
+                }
+            );
+        });
+    }
+
+    async removeGiveawayEntry(giveawayId, userId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'DELETE FROM giveaway_entries WHERE giveaway_id = ? AND user_id = ?',
+                [giveawayId, userId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.changes);
+                }
+            );
+        });
+    }
+
+    async getGiveawayEntries(giveawayId) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT * FROM giveaway_entries WHERE giveaway_id = ?',
+                [giveawayId],
+                (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                }
+            );
+        });
+    }
+
+    async deleteGiveaway(messageId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'DELETE FROM giveaways WHERE message_id = ?',
+                [messageId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.changes);
+                }
+            );
+        });
+    }
+
+    async deleteGiveawayEntries(giveawayId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'DELETE FROM giveaway_entries WHERE giveaway_id = ?',
+                [giveawayId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.changes);
                 }
             );
         });
