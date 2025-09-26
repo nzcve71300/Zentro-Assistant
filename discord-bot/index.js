@@ -40,10 +40,10 @@ const GUILD_CONFIGS = {
         welcomeChannelId: '1417118808736534601',
         memberRoleId: '1410772028876787794'
     },
-    '1420879668248182840': { // New guild - you'll need to set these IDs
-        promotionChannelId: null, // Set this to your promotion channel ID
-        welcomeChannelId: null,   // Set this to your welcome channel ID  
-        memberRoleId: null        // Set this to your member role ID
+    '1420879668248182840': { // New guild
+        promotionChannelId: null, // No promotion channel needed
+        welcomeChannelId: '1420880434266374154',   // Your welcome channel
+        memberRoleId: '1421093697491177513'        // Your member role
     }
 };
 
