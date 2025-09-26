@@ -32,7 +32,20 @@ let ticketCounter = 1;
 
 const ALLOWED_GUILD_IDS = ['1385691441967267953', '1420879668248182840'];
 const ADMIN_ROLE_NAME = '[ZENTRO]Assistant';
-const PROMOTION_CHANNEL_ID = '1405989727152242718';
+
+// Guild-specific configurations
+const GUILD_CONFIGS = {
+    '1385691441967267953': { // Original Zentro server
+        promotionChannelId: '1405989727152242718',
+        welcomeChannelId: '1417118808736534601',
+        memberRoleId: '1410772028876787794'
+    },
+    '1420879668248182840': { // New guild - you'll need to set these IDs
+        promotionChannelId: null, // Set this to your promotion channel ID
+        welcomeChannelId: null,   // Set this to your welcome channel ID  
+        memberRoleId: null        // Set this to your member role ID
+    }
+};
 
 client.on('guildCreate', guild => {
     if (!ALLOWED_GUILD_IDS.includes(guild.id)) {
@@ -72,15 +85,21 @@ client.on('ready', async () => {
 client.on('guildMemberAdd', async member => {
     if (!ALLOWED_GUILD_IDS.includes(member.guild.id)) return;
     
+    const guildConfig = GUILD_CONFIGS[member.guild.id];
+    if (!guildConfig || !guildConfig.memberRoleId) {
+        console.log(`⚠️ No member role configured for guild ${member.guild.id}`);
+        return;
+    }
+    
     try {
-        // Find the [ZENTRO]MEMBERS role using the specific role ID
-        const memberRole = member.guild.roles.cache.get('1410772028876787794');
+        // Find the [ZENTRO]MEMBERS role using the guild-specific role ID
+        const memberRole = member.guild.roles.cache.get(guildConfig.memberRoleId);
         
         if (memberRole) {
             await member.roles.add(memberRole);
-            console.log(`✅ Assigned [ZENTRO]MEMBERS role to ${member.user.tag}`);
+            console.log(`✅ Assigned [ZENTRO]MEMBERS role to ${member.user.tag} in ${member.guild.name}`);
         } else {
-            console.log('⚠️ [ZENTRO]MEMBERS role not found. Please create it manually.');
+            console.log(`⚠️ [ZENTRO]MEMBERS role not found in ${member.guild.name}. Please create it manually.`);
         }
     } catch (error) {
         console.error('Error assigning role to new member:', error);
@@ -102,9 +121,15 @@ client.on('guildMemberRemove', async member => {
 // Welcome message function
 async function sendWelcomeMessage(member) {
     try {
-        const welcomeChannel = member.guild.channels.cache.get('1417118808736534601');
+        const guildConfig = GUILD_CONFIGS[member.guild.id];
+        if (!guildConfig || !guildConfig.welcomeChannelId) {
+            console.log(`⚠️ No welcome channel configured for guild ${member.guild.id}`);
+            return;
+        }
+        
+        const welcomeChannel = member.guild.channels.cache.get(guildConfig.welcomeChannelId);
         if (!welcomeChannel) {
-            console.log('❌ Welcome channel not found');
+            console.log(`❌ Welcome channel not found in ${member.guild.name}`);
             return;
         }
         
@@ -361,9 +386,14 @@ client.on('messageCreate', async message => {
             await message.delete();
             
             // Create warning embed
+            const guildConfig = GUILD_CONFIGS[message.guildId];
+            const promotionChannelMention = guildConfig && guildConfig.promotionChannelId 
+                ? `<#${guildConfig.promotionChannelId}>` 
+                : 'the promotion channel';
+                
             const warningEmbed = new EmbedBuilder()
                 .setTitle('🚫 Link Blocked')
-                .setDescription(`Hello ${message.author}, Please don't send links in this channel. Use the promotion channel <#${PROMOTION_CHANNEL_ID}>`)
+                .setDescription(`Hello ${message.author}, Please don't send links in this channel. Use ${promotionChannelMention}`)
                 .setColor('#FF0000')
                 .setTimestamp()
                 .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() });
@@ -397,13 +427,15 @@ client.on('messageCreate', async message => {
 
 // Helper function to check if a channel is a ticket channel or promotion channel
 async function isTicketOrPromotionChannel(channel) {
+    const guildConfig = GUILD_CONFIGS[channel.guildId];
+    
     // Check if it's the promotion channel (forum channel)
-    if (channel.id === PROMOTION_CHANNEL_ID) {
+    if (guildConfig && guildConfig.promotionChannelId && channel.id === guildConfig.promotionChannelId) {
         return true;
     }
     
     // Check if it's a forum post inside the promotion forum channel
-    if (channel.parentId === PROMOTION_CHANNEL_ID) {
+    if (guildConfig && guildConfig.promotionChannelId && channel.parentId === guildConfig.promotionChannelId) {
         return true;
     }
     
@@ -430,8 +462,10 @@ client.on('threadCreate', async thread => {
     // Only handle threads in the allowed guilds
     if (!ALLOWED_GUILD_IDS.includes(thread.guildId)) return;
     
+    const guildConfig = GUILD_CONFIGS[thread.guildId];
+    
     // Check if this thread is in the promotion forum channel
-    if (thread.parentId === PROMOTION_CHANNEL_ID) {
+    if (guildConfig && guildConfig.promotionChannelId && thread.parentId === guildConfig.promotionChannelId) {
         try {
             // React with ⬆️ emoji to the first message in the thread
             const firstMessage = await thread.fetchStarterMessage();
