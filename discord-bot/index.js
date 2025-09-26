@@ -511,8 +511,9 @@ async function handleEmbedCommand(interaction) {
                 .setEmoji('📤')
         );
 
-    // Store initial embed data
-    embedData.set(interaction.user.id, {
+    // Store initial embed data (guild-specific)
+    const embedKey = `${interaction.user.id}_${interaction.guildId}`;
+    embedData.set(embedKey, {
         title: '🎯 **Embed Creator**',
         description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
         color: '#5865F2',
@@ -754,8 +755,9 @@ async function handleButtonInteraction(interaction) {
         );
         await interaction.showModal(modal);
     } else if (interaction.customId === 'edit_text') {
-        // Get embed data for this user
-        const data = embedData.get(userId) || {
+        // Get embed data for this user and guild
+        const embedKey = `${userId}_${guildId}`;
+        const data = embedData.get(embedKey) || {
             title: '🎯 **Embed Creator**',
             description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
             color: '#5865F2',
@@ -787,8 +789,9 @@ async function handleButtonInteraction(interaction) {
         );
         await interaction.showModal(modal);
     } else if (interaction.customId === 'edit_style') {
-        // Get embed data for this user
-        const data = embedData.get(userId) || {
+        // Get embed data for this user and guild
+        const embedKey = `${userId}_${guildId}`;
+        const data = embedData.get(embedKey) || {
             title: '🎯 **Embed Creator**',
             description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
             color: '#5865F2',
@@ -812,8 +815,9 @@ async function handleButtonInteraction(interaction) {
         );
         await interaction.showModal(modal);
     } else if (interaction.customId === 'send_embed') {
-        // Get embed data for this user
-        const data = embedData.get(userId) || {
+        // Get embed data for this user and guild
+        const embedKey = `${userId}_${guildId}`;
+        const data = embedData.get(embedKey) || {
             title: '🎯 **Embed Creator**',
             description: 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support',
             color: '#5865F2',
@@ -921,7 +925,10 @@ async function handleButtonInteraction(interaction) {
 
 async function handleModalSubmit(interaction) {
     const userId = interaction.user.id;
-    let data = await db.getEmbedData(userId);
+    const guildId = interaction.guildId;
+    const embedKey = `${userId}_${guildId}`; // Make embed data guild-specific
+    
+    let data = await db.getEmbedData(embedKey);
     if (!data) {
         data = {
             title: '🎯 **Embed Creator**',
@@ -940,9 +947,9 @@ async function handleModalSubmit(interaction) {
         data.description = description || 'Create beautiful, rich embeds with this powerful tool!\n\n**Features:**\n• ✏️ Customize title and description\n• 🎨 Change colors with hex codes or color names\n• 📤 Send professional embeds\n• 🎯 Rich formatting support';
 
         // Save embed data to database
-        await db.saveEmbedData(userId, data);
+        await db.saveEmbedData(embedKey, data);
         // Also update the local Map for immediate use
-        embedData.set(userId, data);
+        embedData.set(embedKey, data);
 
         const embed = new EmbedBuilder()
             .setTitle(data.title)
@@ -990,9 +997,9 @@ async function handleModalSubmit(interaction) {
 
         data.color = color;
         // Save embed data to database
-        await db.saveEmbedData(userId, data);
+        await db.saveEmbedData(embedKey, data);
         // Also update the local Map for immediate use
-        embedData.set(userId, data);
+        embedData.set(embedKey, data);
 
         const embed = new EmbedBuilder()
             .setTitle(data.title)
