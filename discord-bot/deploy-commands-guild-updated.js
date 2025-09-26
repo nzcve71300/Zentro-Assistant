@@ -2,7 +2,7 @@ const { REST, Routes } = require('discord.js');
 require('dotenv').config();
 
 // Role ID for [ZENTRO]Assistant - UPDATE THIS AFTER CREATING THE ROLE
-const ADMIN_ROLE_ID = 'YOUR_ROLE_ID_HERE'; // Run get-role-id.js to get this
+const ADMIN_ROLE_ID = '1413586059756834877'; // Run get-role-id.js to get this
 
 const commands = [
     {
