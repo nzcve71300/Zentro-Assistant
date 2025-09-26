@@ -138,8 +138,10 @@ async function sendWelcomeMessage(member) {
         
         // Create a clean horizontal welcome embed
         const welcomeEmbed = new EmbedBuilder()
-            .setTitle('**WELCOME TO ZENTRO**')
-            .setDescription(`**Hey there, ${member.user}!**\n\n**You are our ${memberCount}${getOrdinalSuffix(memberCount)} member!**\n\nWelcome to the **ZENTRO** community! We're thrilled to have you join our amazing server. Get ready for an incredible experience with our premium Discord bot!`)
+            .setTitle(member.guild.id === '1420879668248182840' ? '**WELCOME TO ZENTRO VANILLA +**' : '**WELCOME TO ZENTRO**')
+            .setDescription(member.guild.id === '1420879668248182840' 
+                ? `**Hey there, ${member.user}!**\n\n**You are our ${memberCount}${getOrdinalSuffix(memberCount)} member!**\n\nWelcome to the **ZENTRO** community! We're thrilled to have you join our amazing server. Get ready for an incredible experience with our premium Discord bot!`
+                : `**Hey there, ${member.user}!**\n\n**You are our ${memberCount}${getOrdinalSuffix(memberCount)} member!**\n\nWelcome to the **ZENTRO** community! We're thrilled to have you join our amazing server. Get ready for an incredible experience with our premium Discord bot!`)
             .setColor(orange)
             .setThumbnail('https://i.imgur.com/Wl2DxPD.png')
             .setImage('https://i.imgur.com/Wl2DxPD.png')
@@ -2248,12 +2250,22 @@ async function createGiveaway(interaction, data) {
         // Create giveaway embed
         const orange = 0xFFA500;
         const endTimeUnix = Math.floor(endTime / 1000);
+        const now = Math.floor(Date.now() / 1000);
+        const timeLeft = endTimeUnix - now;
+        
+        console.log(`⏰ Giveaway timing: Now=${now}, End=${endTimeUnix}, Left=${timeLeft} seconds`);
+        
+        // Format time remaining manually for more precision
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        const timeDisplay = timeLeft < 60 ? `${seconds}s` : `${minutes}m ${seconds}s`;
+        
         const embed = new EmbedBuilder()
             .setTitle(`**${name}**`)
             .setDescription(`**${description}**`)
             .setColor(orange)
             .addFields(
-                { name: '**Time Remaining**', value: `<t:${endTimeUnix}:R>`, inline: false },
+                { name: '**Time Remaining**', value: `${timeDisplay} (<t:${endTimeUnix}:R>)`, inline: false },
                 { name: '**Max Winners**', value: maxWinnersNum.toString(), inline: false },
                 { name: '**Entrants**', value: '0', inline: false }
             )
@@ -2553,12 +2565,20 @@ async function updateGiveawayEmbed(message) {
 
         const orange = 0xFFA500;
         const endTimeUnix = Math.floor(giveaway.end_time / 1000);
+        const now = Math.floor(Date.now() / 1000);
+        const timeLeft = endTimeUnix - now;
+        
+        // Format time remaining manually for more precision
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        const timeDisplay = timeLeft < 60 ? `${seconds}s` : `${minutes}m ${seconds}s`;
+        
         const embed = new EmbedBuilder()
             .setTitle(`**${giveaway.name}**`)
             .setDescription(`**${giveaway.description}**`)
             .setColor(orange)
             .addFields(
-                { name: '**Time Remaining**', value: `<t:${endTimeUnix}:R>`, inline: false },
+                { name: '**Time Remaining**', value: `${timeDisplay} (<t:${endTimeUnix}:R>)`, inline: false },
                 { name: '**Max Winners**', value: giveaway.max_winners.toString(), inline: false },
                 { name: '**Entrants**', value: entryCount.toString(), inline: false }
             )
