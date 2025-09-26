@@ -96,6 +96,42 @@ class Database {
             this.db.run(`
                 INSERT OR IGNORE INTO ticket_counter (id, counter) VALUES (1, 1)
             `);
+
+            // Create Zentro ticket configuration table
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS zentro_ticket_config (
+                    guild_id TEXT PRIMARY KEY,
+                    channel_id TEXT NOT NULL,
+                    role_id TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            // Create Zentro open tickets table
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS zentro_open_tickets (
+                    user_id TEXT PRIMARY KEY,
+                    channel_id TEXT NOT NULL,
+                    ticket_number INTEGER NOT NULL,
+                    random_number INTEGER NOT NULL,
+                    ticket_type TEXT NOT NULL,
+                    ticket_data TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+
+            // Create Zentro ticket counter table
+            this.db.run(`
+                CREATE TABLE IF NOT EXISTS zentro_ticket_counter (
+                    id INTEGER PRIMARY KEY,
+                    counter INTEGER DEFAULT 1
+                )
+            `);
+
+            // Initialize Zentro ticket counter if it doesn't exist
+            this.db.run(`
+                INSERT OR IGNORE INTO zentro_ticket_counter (id, counter) VALUES (1, 1)
+            `);
         });
     }
 
@@ -497,6 +533,136 @@ class Database {
                     resolve(null);
                 }
             });
+        });
+    }
+
+    // Zentro Ticket Configuration Methods
+    async saveZentoTicketConfig(guildId, channelId, roleId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT OR REPLACE INTO zentro_ticket_config (guild_id, channel_id, role_id) VALUES (?, ?, ?)',
+                [guildId, channelId, roleId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.lastID);
+                }
+            );
+        });
+    }
+
+    async getZentoTicketConfig(guildId) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT * FROM zentro_ticket_config WHERE guild_id = ?',
+                [guildId],
+                (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                }
+            );
+        });
+    }
+
+    // Zentro Open Tickets Methods
+    async saveOpenZentoTicket(userId, channelId, ticketNumber, randomNumber, ticketType, ticketData) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'INSERT OR REPLACE INTO zentro_open_tickets (user_id, channel_id, ticket_number, random_number, ticket_type, ticket_data) VALUES (?, ?, ?, ?, ?, ?)',
+                [userId, channelId, ticketNumber, randomNumber, ticketType, ticketData],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.lastID);
+                }
+            );
+        });
+    }
+
+    async getOpenZentoTicket(userId) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT * FROM zentro_open_tickets WHERE user_id = ?',
+                [userId],
+                (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                }
+            );
+        });
+    }
+
+    async getOpenZentoTicketByChannel(channelId) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT * FROM zentro_open_tickets WHERE channel_id = ?',
+                [channelId],
+                (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row);
+                }
+            );
+        });
+    }
+
+    async deleteOpenZentoTicket(userId) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'DELETE FROM zentro_open_tickets WHERE user_id = ?',
+                [userId],
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.changes);
+                }
+            );
+        });
+    }
+
+    // Zentro Ticket Counter Methods
+    async getZentoTicketCounter() {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                'SELECT counter FROM zentro_ticket_counter WHERE id = 1',
+                (err, row) => {
+                    if (err) reject(err);
+                    else resolve(row ? row.counter : 1);
+                }
+            );
+        });
+    }
+
+    async incrementZentoTicketCounter() {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                'UPDATE zentro_ticket_counter SET counter = counter + 1 WHERE id = 1',
+                function(err) {
+                    if (err) reject(err);
+                    else resolve(this.changes);
+                }
+            );
+        });
+    }
+
+    // Load all Zentro ticket data methods for startup
+    async loadAllZentoTicketConfigs() {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT * FROM zentro_ticket_config',
+                (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                }
+            );
+        });
+    }
+
+    async loadAllZentoTickets() {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                'SELECT * FROM zentro_open_tickets',
+                (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                }
+            );
         });
     }
 

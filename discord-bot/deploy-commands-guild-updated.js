@@ -206,6 +206,27 @@ const commands = [
         ],
         defaultMemberPermissions: '0',
         dmPermission: false
+    },
+    {
+        name: 'setup-zentro-ticket',
+        description: 'Setup the Zentro ticket system with specialized help categories',
+        options: [
+            {
+                name: 'role',
+                description: 'The staff role allowed to help with Zentro tickets',
+                type: 8, // ROLE
+                required: true
+            },
+            {
+                name: 'channel',
+                description: 'The channel to send the Zentro ticket panel to',
+                type: 7, // CHANNEL
+                required: true,
+                channel_types: [0] // GUILD_TEXT
+            }
+        ],
+        defaultMemberPermissions: '0',
+        dmPermission: false
     }
 ];
 

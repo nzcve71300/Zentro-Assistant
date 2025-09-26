@@ -30,12 +30,12 @@ const openTickets = new Map(); // userId -> { channelId, ticketNumber, randomNum
 const ticketCategories = new Map(); // guildId -> { setupCategoryId, supportCategoryId }
 let ticketCounter = 1;
 
-const ALLOWED_GUILD_ID = '1385691441967267953';
+const ALLOWED_GUILD_IDS = ['1385691441967267953', '1420879668248182840'];
 const ADMIN_ROLE_NAME = '[ZENTRO]Assistant';
 const PROMOTION_CHANNEL_ID = '1405989727152242718';
 
 client.on('guildCreate', guild => {
-    if (guild.id !== ALLOWED_GUILD_ID) {
+    if (!ALLOWED_GUILD_IDS.includes(guild.id)) {
         guild.leave();
     }
 });
@@ -43,7 +43,7 @@ client.on('guildCreate', guild => {
 client.on('ready', async () => {
     // If the bot is in any other guild, leave them
     client.guilds.cache.forEach(guild => {
-        if (guild.id !== ALLOWED_GUILD_ID) {
+        if (!ALLOWED_GUILD_IDS.includes(guild.id)) {
             guild.leave();
         }
     });
@@ -52,10 +52,12 @@ client.on('ready', async () => {
         // Load all data from database
         await loadDataFromDatabase();
         
-        // Restore existing ticket categories
-        const guild = client.guilds.cache.get(ALLOWED_GUILD_ID);
-        if (guild) {
-            await restoreTicketCategories(guild);
+        // Restore existing ticket categories for all allowed guilds
+        for (const guildId of ALLOWED_GUILD_IDS) {
+            const guild = client.guilds.cache.get(guildId);
+            if (guild) {
+                await restoreTicketCategories(guild);
+            }
         }
         
         console.log(`Logged in as ${client.user.tag}!`);
@@ -68,7 +70,7 @@ client.on('ready', async () => {
 
 // Handle new member joins - automatically assign [ZENTRO]MEMBERS role
 client.on('guildMemberAdd', async member => {
-    if (member.guild.id !== ALLOWED_GUILD_ID) return;
+    if (!ALLOWED_GUILD_IDS.includes(member.guild.id)) return;
     
     try {
         // Find the [ZENTRO]MEMBERS role using the specific role ID
@@ -93,7 +95,7 @@ client.on('guildMemberAdd', async member => {
 
 // Handle member leaves - for tracking rejoins
 client.on('guildMemberRemove', async member => {
-    if (member.guild.id !== ALLOWED_GUILD_ID) return;
+    if (!ALLOWED_GUILD_IDS.includes(member.guild.id)) return;
     console.log(`👋 ${member.user.tag} left the server`);
 });
 
@@ -234,6 +236,8 @@ client.on('interactionCreate', async interaction => {
             await handleEditRR(interaction);
         } else if (interaction.commandName === 'link-thread') {
             await handleLinkThread(interaction);
+        } else if (interaction.commandName === 'setup-zentro-ticket') {
+            await handleSetupZentoTicket(interaction);
         }
     } else if (interaction.isButton()) {
         await handleButtonInteraction(interaction);
@@ -339,7 +343,7 @@ function getReactionKey(reaction) {
 // Handle message events for link blocking
 client.on('messageCreate', async message => {
     // Ignore bot messages and messages from other guilds
-    if (message.author.bot || message.guildId !== ALLOWED_GUILD_ID) return;
+    if (message.author.bot || !ALLOWED_GUILD_IDS.includes(message.guildId)) return;
     
     // First check if this is a ticket channel or promotion channel - if so, allow all links
     const isAllowedChannel = await isTicketOrPromotionChannel(message.channel);
@@ -423,8 +427,8 @@ async function isTicketOrPromotionChannel(channel) {
 
 // Handle new forum posts - auto-react with ⬆️ emoji
 client.on('threadCreate', async thread => {
-    // Only handle threads in the allowed guild
-    if (thread.guildId !== ALLOWED_GUILD_ID) return;
+    // Only handle threads in the allowed guilds
+    if (!ALLOWED_GUILD_IDS.includes(thread.guildId)) return;
     
     // Check if this thread is in the promotion forum channel
     if (thread.parentId === PROMOTION_CHANNEL_ID) {
@@ -794,6 +798,90 @@ async function handleButtonInteraction(interaction) {
         
         await interaction.channel.send({ embeds: [embed] });
         await interaction.reply({ content: '✅ Embed sent successfully!', ephemeral: true });
+    } else if (interaction.customId === 'rust_help') {
+        // Modal for Rust help
+        const modal = new ModalBuilder()
+            .setCustomId('rust_help_modal')
+            .setTitle('Rust Help Request');
+        const ignInput = new TextInputBuilder()
+            .setCustomId('rust_ign')
+            .setLabel('What is your in-game name?')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Enter your in-game name...')
+            .setRequired(true);
+        const helpInput = new TextInputBuilder()
+            .setCustomId('rust_help_description')
+            .setLabel('How can we help?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Describe your issue or question...')
+            .setRequired(true)
+            .setMaxLength(1000);
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(ignInput),
+            new ActionRowBuilder().addComponents(helpInput)
+        );
+        await interaction.showModal(modal);
+    } else if (interaction.customId === 'discord_help') {
+        // Modal for Discord help
+        const modal = new ModalBuilder()
+            .setCustomId('discord_help_modal')
+            .setTitle('Discord Help Request');
+        const helpInput = new TextInputBuilder()
+            .setCustomId('discord_help_description')
+            .setLabel('How can we help?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Describe your Discord issue or question...')
+            .setRequired(true)
+            .setMaxLength(1000);
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(helpInput)
+        );
+        await interaction.showModal(modal);
+    } else if (interaction.customId === 'purchase_help') {
+        // Modal for Purchase help
+        const modal = new ModalBuilder()
+            .setCustomId('purchase_help_modal')
+            .setTitle('Purchase Help Request');
+        const helpInput = new TextInputBuilder()
+            .setCustomId('purchase_help_description')
+            .setLabel('How can we help?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Describe your purchase issue or question...')
+            .setRequired(true)
+            .setMaxLength(1000);
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(helpInput)
+        );
+        await interaction.showModal(modal);
+    } else if (interaction.customId === 'verify_purchase') {
+        // Modal for Verify Purchase
+        const modal = new ModalBuilder()
+            .setCustomId('verify_purchase_modal')
+            .setTitle('Verify Purchase');
+        const emailInput = new TextInputBuilder()
+            .setCustomId('verify_email')
+            .setLabel('Email used to purchase')
+            .setStyle(TextInputStyle.Short)
+            .setPlaceholder('Enter the email you used for purchase...')
+            .setRequired(true);
+        const purchaseInput = new TextInputBuilder()
+            .setCustomId('verify_purchase_item')
+            .setLabel('What did you purchase?')
+            .setStyle(TextInputStyle.Paragraph)
+            .setPlaceholder('Describe what you purchased...')
+            .setRequired(true)
+            .setMaxLength(1000);
+        modal.addComponents(
+            new ActionRowBuilder().addComponents(emailInput),
+            new ActionRowBuilder().addComponents(purchaseInput)
+        );
+        await interaction.showModal(modal);
+    } else if (interaction.customId === 'claim_ticket') {
+        // Handle claim ticket button
+        await handleClaimTicket(interaction);
+    } else if (interaction.customId === 'close_zentro_ticket') {
+        // Handle close ticket button
+        await handleCloseZentoTicket(interaction);
     }
 }
 
@@ -922,6 +1010,20 @@ async function handleModalSubmit(interaction) {
             .setColor(orange)
             .setFooter({ text: 'Powered by Zentro', iconURL: interaction.client.user.displayAvatarURL() });
         await interaction.reply({ embeds: [embed] });
+    } else if (interaction.customId === 'rust_help_modal') {
+        const ign = interaction.fields.getTextInputValue('rust_ign');
+        const helpDescription = interaction.fields.getTextInputValue('rust_help_description');
+        await createZentoTicket(interaction, 'rust', { ign, helpDescription });
+    } else if (interaction.customId === 'discord_help_modal') {
+        const helpDescription = interaction.fields.getTextInputValue('discord_help_description');
+        await createZentoTicket(interaction, 'discord', { helpDescription });
+    } else if (interaction.customId === 'purchase_help_modal') {
+        const helpDescription = interaction.fields.getTextInputValue('purchase_help_description');
+        await createZentoTicket(interaction, 'purchase', { helpDescription });
+    } else if (interaction.customId === 'verify_purchase_modal') {
+        const email = interaction.fields.getTextInputValue('verify_email');
+        const purchaseItem = interaction.fields.getTextInputValue('verify_purchase_item');
+        await createZentoTicket(interaction, 'verify', { email, purchaseItem });
     }
 }
 
@@ -1063,7 +1165,7 @@ async function handleTicketClose(interaction) {
 }
 
 function isAllowedGuild(interaction) {
-    return interaction.guildId === ALLOWED_GUILD_ID;
+    return ALLOWED_GUILD_IDS.includes(interaction.guildId);
 }
 
 function hasAdminRole(interaction) {
@@ -1632,6 +1734,372 @@ function parseHexColor(hex, fallback = 0x2b2d31) {
     const cleaned = hex.replace(/^#/, '').trim();
     if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return fallback;
     return parseInt(cleaned, 16);
+}
+
+// Handle the /setup-zentro-ticket command
+async function handleSetupZentoTicket(interaction) {
+    try {
+        // Only allow admins
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            await interaction.reply({ content: 'You need to be an administrator to use this command.', ephemeral: true });
+            return;
+        }
+
+        const role = interaction.options.getRole('role');
+        const channel = interaction.options.getChannel('channel');
+
+        if (!role || !channel) {
+            await interaction.reply({ content: 'You must specify both a role and a channel.', ephemeral: true });
+            return;
+        }
+
+        // Save config for this guild to database
+        await db.saveZentoTicketConfig(interaction.guildId, channel.id, role.id);
+
+        // Orange color
+        const orange = 0xFFA500;
+        const embed = new EmbedBuilder()
+            .setTitle('Welcome to Zentro support!')
+            .setDescription('Please enter a brief description of what\'s happening so that staff can assist you As Soon As Possible!')
+            .setColor(orange)
+            .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() });
+
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('rust_help')
+                    .setLabel('Rust Help')
+                    .setStyle(ButtonStyle.Danger),
+                new ButtonBuilder()
+                    .setCustomId('discord_help')
+                    .setLabel('Discord Help')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('purchase_help')
+                    .setLabel('Purchase Help')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('verify_purchase')
+                    .setLabel('Verify Purchase')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+        await channel.send({ embeds: [embed], components: [row] });
+        await interaction.reply({ content: `Zentro ticket panel sent to ${channel}.`, ephemeral: true });
+
+    } catch (error) {
+        console.error('Error in handleSetupZentoTicket:', error);
+        await interaction.reply({ 
+            content: 'An error occurred while setting up the Zentro ticket system.', 
+            ephemeral: true 
+        });
+    }
+}
+
+// Create Zentro ticket
+async function createZentoTicket(interaction, ticketType, data) {
+    try {
+        const userId = interaction.user.id;
+        const guildId = interaction.guildId;
+
+        // Check if user already has an open ticket
+        const existingTicket = await db.getOpenZentoTicket(userId);
+        if (existingTicket) {
+            await interaction.reply({ 
+                content: `You already have an open ticket: <#${existingTicket.channel_id}>\nPlease close your existing ticket before opening a new one.`, 
+                ephemeral: true 
+            });
+            return;
+        }
+
+        // Get config
+        const config = await db.getZentoTicketConfig(guildId);
+        if (!config) {
+            await interaction.reply({ content: 'Zentro ticket system is not configured. Please ask an admin to run /setup-zentro-ticket.', ephemeral: true });
+            return;
+        }
+
+        const guild = interaction.guild;
+        const staffRole = config.role_id;
+        const ticketNumber = await db.getZentoTicketCounter();
+        await db.incrementZentoTicketCounter();
+        const randomNumber = Math.floor(Math.random() * 1000000);
+        
+        // Create category name based on ticket type
+        let categoryName, categoryColor;
+        switch (ticketType) {
+            case 'rust':
+                categoryName = '🦀 Rust Help Tickets';
+                categoryColor = 0xFF0000; // Red
+                break;
+            case 'discord':
+                categoryName = '💬 Discord Help Tickets';
+                categoryColor = 0x0099FF; // Blue
+                break;
+            case 'purchase':
+                categoryName = '💳 Purchase Help Tickets';
+                categoryColor = 0x808080; // Grey
+                break;
+            case 'verify':
+                categoryName = '✅ Verify Purchase Tickets';
+                categoryColor = 0x00FF00; // Green
+                break;
+        }
+
+        // Get or create category
+        const categoryId = await getOrCreateZentoTicketCategory(guild, ticketType, categoryName, categoryColor);
+        if (!categoryId) {
+            await interaction.reply({ 
+                content: 'Failed to create ticket category. Please contact an administrator.', 
+                ephemeral: true 
+            });
+            return;
+        }
+
+        const channelName = `🎫| ${userId}${randomNumber}`;
+        const ticketChannel = await guild.channels.create({
+            name: channelName,
+            type: ChannelType.GuildText,
+            parent: categoryId,
+            permissionOverwrites: [
+                { id: guild.roles.everyone, deny: ['ViewChannel'] },
+                { id: userId, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] },
+                { id: staffRole, allow: ['ViewChannel', 'SendMessages', 'ReadMessageHistory'] }
+            ]
+        });
+
+        // Save ticket to database
+        await db.saveOpenZentoTicket(userId, ticketChannel.id, ticketNumber, randomNumber, ticketType, JSON.stringify(data));
+        
+        // Create summary embed
+        const orange = 0xFFA500;
+        const summaryEmbed = new EmbedBuilder()
+            .setTitle('Ticket Information')
+            .setColor(orange)
+            .setTimestamp()
+            .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() });
+
+        // Add fields based on ticket type
+        switch (ticketType) {
+            case 'rust':
+                summaryEmbed.addFields(
+                    { name: 'Ticket Type', value: 'Rust Help', inline: true },
+                    { name: 'In-Game Name', value: data.ign, inline: true },
+                    { name: 'Description', value: data.helpDescription, inline: false }
+                );
+                break;
+            case 'discord':
+                summaryEmbed.addFields(
+                    { name: 'Ticket Type', value: 'Discord Help', inline: true },
+                    { name: 'Description', value: data.helpDescription, inline: false }
+                );
+                break;
+            case 'purchase':
+                summaryEmbed.addFields(
+                    { name: 'Ticket Type', value: 'Purchase Help', inline: true },
+                    { name: 'Description', value: data.helpDescription, inline: false }
+                );
+                break;
+            case 'verify':
+                summaryEmbed.addFields(
+                    { name: 'Ticket Type', value: 'Verify Purchase', inline: true },
+                    { name: 'Email', value: data.email, inline: true },
+                    { name: 'Purchase Item', value: data.purchaseItem, inline: false }
+                );
+                break;
+        }
+
+        // Create management buttons
+        const managementRow = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('claim_ticket')
+                    .setLabel('Claim Ticket')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('close_zentro_ticket')
+                    .setLabel('Close Ticket')
+                    .setStyle(ButtonStyle.Danger)
+            );
+
+        // Send initial messages
+        await ticketChannel.send({ 
+            content: `Hold on, I'm calling the staff team - <@&${staffRole}>`,
+            embeds: [summaryEmbed],
+            components: [managementRow]
+        });
+
+        // Ephemeral reply
+        await interaction.reply({
+            content: `You have successfully opened a ticket here: <#${ticketChannel.id}>\nTicket number: ${ticketNumber}`,
+            ephemeral: true
+        });
+
+        console.log(`✅ Zentro ticket created successfully for user ${userId}: ${ticketChannel.id}`);
+
+    } catch (error) {
+        console.error('❌ Error creating Zentro ticket:', error);
+        await interaction.reply({ 
+            content: 'An error occurred while creating your ticket. Please try again or contact an administrator.', 
+            ephemeral: true 
+        });
+    }
+}
+
+// Handle claim ticket button
+async function handleClaimTicket(interaction) {
+    try {
+        // Check if user has the required role
+        const config = await db.getZentoTicketConfig(interaction.guildId);
+        if (!config) {
+            await interaction.reply({ content: 'Ticket system not configured.', ephemeral: true });
+            return;
+        }
+
+        if (!interaction.member.roles.cache.has(config.role_id)) {
+            await interaction.reply({ content: 'You do not have permission to claim tickets.', ephemeral: true });
+            return;
+        }
+
+        // Update the claim button to show it's claimed
+        const claimedRow = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('claim_ticket')
+                    .setLabel('Claimed by ' + interaction.user.username)
+                    .setStyle(ButtonStyle.Success)
+                    .setDisabled(true),
+                new ButtonBuilder()
+                    .setCustomId('close_zentro_ticket')
+                    .setLabel('Close Ticket')
+                    .setStyle(ButtonStyle.Danger)
+            );
+
+        await interaction.update({ components: [claimedRow] });
+        await interaction.followUp({ 
+            content: `Ticket claimed by ${interaction.user}!`, 
+            ephemeral: false 
+        });
+
+    } catch (error) {
+        console.error('Error in handleClaimTicket:', error);
+        await interaction.reply({ 
+            content: 'An error occurred while claiming the ticket.', 
+            ephemeral: true 
+        });
+    }
+}
+
+// Handle close Zentro ticket button
+async function handleCloseZentoTicket(interaction) {
+    try {
+        const userId = interaction.user.id;
+        const ticket = await db.getOpenZentoTicketByChannel(interaction.channel.id);
+        
+        if (!ticket) {
+            await interaction.reply({ content: 'This is not a ticket channel.', ephemeral: true });
+            return;
+        }
+
+        // Check permissions - user who created ticket or staff role
+        const config = await db.getZentoTicketConfig(interaction.guildId);
+        const isTicketOwner = ticket.user_id === userId;
+        const isStaff = config && interaction.member.roles.cache.has(config.role_id);
+
+        if (!isTicketOwner && !isStaff) {
+            await interaction.reply({ content: 'You do not have permission to close this ticket.', ephemeral: true });
+            return;
+        }
+
+        // Update channel name to closed format
+        try {
+            await interaction.channel.setName(`🏁| ${ticket.user_id}${ticket.random_number}`);
+        } catch (error) {
+            console.error('Failed to rename channel:', error);
+        }
+
+        // Send finish message
+        const orange = 0xFFA500;
+        const finishEmbed = new EmbedBuilder()
+            .setTitle('Ticket Closed')
+            .setDescription(`Ticket number: ${ticket.ticket_number}`)
+            .setColor(orange)
+            .setFooter({ text: 'Powered by Zentro', iconURL: interaction.client.user.displayAvatarURL() });
+        
+        await interaction.channel.send({ embeds: [finishEmbed] });
+
+        // Schedule channel deletion
+        setTimeout(async () => {
+            try {
+                await interaction.channel.delete();
+            } catch (error) {
+                console.error('Failed to delete channel:', error);
+            }
+        }, 60000); // 1 minute
+
+        // Send DM to user
+        const user = await interaction.client.users.fetch(ticket.user_id);
+        const dmEmbed = new EmbedBuilder()
+            .setTitle('ZENTRO BOT')
+            .setDescription('Thank you for using Zentro support! We hope we were able to assist you with your request. If you need any more help, feel free to open a ticket again!')
+            .setColor(orange)
+            .setFooter({ text: 'Powered by Zentro', iconURL: 'https://cdn.discordapp.com/attachments/1390084651057418352/1402975345941942344/Zentro-picture.png.png?ex=6895de1c&is=68948c9c&hm=fee1cf71e083a86406b8a90c2bf9f7035d07115c8962cf0ea2c7b9aed1455444&' })
+            .setImage('https://cdn.discordapp.com/attachments/1390084651057418352/1402975345941942344/Zentro-picture.png.png?ex=6895de1c&is=68948c9c&hm=fee1cf71e083a86406b8a90c2bf9f7035d07115c8962cf0ea2c7b9aed1455444&');
+
+        try {
+            await user.send({ embeds: [dmEmbed] });
+        } catch (error) {
+            console.error('Failed to send DM:', error);
+        }
+
+        await interaction.reply({ content: 'Ticket will be closed and channel deleted in 1 minute.', ephemeral: true });
+
+        // Remove ticket from database
+        await db.deleteOpenZentoTicket(ticket.user_id);
+
+    } catch (error) {
+        console.error('Error in handleCloseZentoTicket:', error);
+        await interaction.reply({ 
+            content: 'An error occurred while closing the ticket.', 
+            ephemeral: true 
+        });
+    }
+}
+
+// Helper function to get or create Zentro ticket categories
+async function getOrCreateZentoTicketCategory(guild, ticketType, categoryName, categoryColor) {
+    const guildId = guild.id;
+    
+    // Check if category already exists
+    const existingCategory = guild.channels.cache.find(channel => 
+        channel.type === ChannelType.GuildCategory && 
+        channel.name === categoryName
+    );
+    
+    if (existingCategory) {
+        return existingCategory.id;
+    }
+    
+    // Create new category
+    try {
+        const category = await guild.channels.create({
+            name: categoryName,
+            type: ChannelType.GuildCategory,
+            permissionOverwrites: [
+                {
+                    id: guild.roles.everyone,
+                    deny: ['ViewChannel']
+                }
+            ]
+        });
+        
+        console.log(`Created Zentro category: ${categoryName} (${category.id})`);
+        return category.id;
+        
+    } catch (error) {
+        console.error(`Failed to create Zentro category:`, error);
+        return null;
+    }
 }
 
 client.login(process.env.TOKEN); 
