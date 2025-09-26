@@ -382,6 +382,21 @@ client.on('messageCreate', async message => {
         return; // Allow all messages in ticket/promotion channels
     }
     
+    // Check if this is an allowed channel in the new guild (1420879668248182840)
+    if (message.guildId === '1420879668248182840') {
+        const allowedChannels = [
+            '1420880461776945268',
+            '1420880466030100491', 
+            '1420880460522983485',
+            '1420880441279381658',
+            '1420880442265047154'
+        ];
+        
+        if (allowedChannels.includes(message.channel.id)) {
+            return; // Allow all messages in these specific channels
+        }
+    }
+    
     // Check if the message contains a link
     const linkRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/gi;
     const hasLink = linkRegex.test(message.content);
