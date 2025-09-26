@@ -2247,12 +2247,13 @@ async function createGiveaway(interaction, data) {
 
         // Create giveaway embed
         const orange = 0xFFA500;
+        const endTimeUnix = Math.floor(endTime / 1000);
         const embed = new EmbedBuilder()
             .setTitle(`**${name}**`)
             .setDescription(`**${description}**`)
             .setColor(orange)
             .addFields(
-                { name: '**Time Remaining**', value: `<t:${Math.floor(endTime / 1000)}:R>`, inline: false },
+                { name: '**Time Remaining**', value: `<t:${endTimeUnix}:R>`, inline: false },
                 { name: '**Max Winners**', value: maxWinnersNum.toString(), inline: false },
                 { name: '**Entrants**', value: '0', inline: false }
             )
@@ -2421,7 +2422,10 @@ function parseTime(timeStr) {
         return null;
     }
     
-    return Date.now() + milliseconds;
+    const endTime = Date.now() + milliseconds;
+    console.log(`⏰ Time parsing: "${timeStr}" -> ${value}${unit} -> ${milliseconds}ms -> ends at ${new Date(endTime).toISOString()}`);
+    
+    return endTime;
 }
 
 // Start giveaway countdown
@@ -2496,7 +2500,15 @@ async function endGiveaway(messageId, forceClose = false) {
                 
                 // Send winner announcement
                 const winnerMention = winners.map(w => `<@${w.user_id}>`).join(' ');
-                await channel.send(`**Congratulations to the winners of "${giveaway.name}"!**\n\n${winnerMention}`);
+                const orange = 0xFFA500;
+                const winnerEmbed = new EmbedBuilder()
+                    .setTitle('🎉 **Giveaway Ended!**')
+                    .setDescription(`**Congratulations to the winners of "${giveaway.name}"!**\n\n${winnerMention}`)
+                    .setColor(orange)
+                    .setFooter({ text: 'Powered by Zentro', iconURL: client.user.displayAvatarURL() })
+                    .setTimestamp();
+                
+                await channel.send({ embeds: [winnerEmbed] });
             }
         }
 
@@ -2540,12 +2552,13 @@ async function updateGiveawayEmbed(message) {
         const entryCount = entries.length;
 
         const orange = 0xFFA500;
+        const endTimeUnix = Math.floor(giveaway.end_time / 1000);
         const embed = new EmbedBuilder()
             .setTitle(`**${giveaway.name}**`)
             .setDescription(`**${giveaway.description}**`)
             .setColor(orange)
             .addFields(
-                { name: '**Time Remaining**', value: `<t:${Math.floor(giveaway.end_time / 1000)}:R>`, inline: false },
+                { name: '**Time Remaining**', value: `<t:${endTimeUnix}:R>`, inline: false },
                 { name: '**Max Winners**', value: giveaway.max_winners.toString(), inline: false },
                 { name: '**Entrants**', value: entryCount.toString(), inline: false }
             )
