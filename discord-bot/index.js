@@ -2270,10 +2270,23 @@ async function createGiveaway(interaction, data) {
         
         console.log(`⏰ Giveaway timing: Now=${now}, End=${endTimeUnix}, Left=${timeLeft} seconds`);
         
-        // Format time remaining manually for more precision
-        const minutes = Math.floor(timeLeft / 60);
-        const seconds = timeLeft % 60;
-        const timeDisplay = timeLeft < 60 ? `${seconds}s` : `${minutes}m ${seconds}s`;
+        // Format time remaining properly
+        let timeDisplay;
+        if (timeLeft < 60) {
+            timeDisplay = `${timeLeft}s`;
+        } else if (timeLeft < 3600) {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timeDisplay = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+        } else if (timeLeft < 86400) {
+            const hours = Math.floor(timeLeft / 3600);
+            const minutes = Math.floor((timeLeft % 3600) / 60);
+            timeDisplay = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+        } else {
+            const days = Math.floor(timeLeft / 86400);
+            const hours = Math.floor((timeLeft % 86400) / 3600);
+            timeDisplay = hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+        }
         
         const embed = new EmbedBuilder()
             .setTitle(`**${name}**`)
@@ -2583,10 +2596,23 @@ async function updateGiveawayEmbed(message) {
         const now = Math.floor(Date.now() / 1000);
         const timeLeft = endTimeUnix - now;
         
-        // Format time remaining manually for more precision
-        const minutes = Math.floor(timeLeft / 60);
-        const seconds = timeLeft % 60;
-        const timeDisplay = timeLeft < 60 ? `${seconds}s` : `${minutes}m ${seconds}s`;
+        // Format time remaining properly
+        let timeDisplay;
+        if (timeLeft < 60) {
+            timeDisplay = `${timeLeft}s`;
+        } else if (timeLeft < 3600) {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            timeDisplay = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+        } else if (timeLeft < 86400) {
+            const hours = Math.floor(timeLeft / 3600);
+            const minutes = Math.floor((timeLeft % 3600) / 60);
+            timeDisplay = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+        } else {
+            const days = Math.floor(timeLeft / 86400);
+            const hours = Math.floor((timeLeft % 86400) / 3600);
+            timeDisplay = hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+        }
         
         const embed = new EmbedBuilder()
             .setTitle(`**${giveaway.name}**`)
