@@ -2265,35 +2265,15 @@ async function createGiveaway(interaction, data) {
         // Create giveaway embed
         const orange = 0xFFA500;
         const endTimeUnix = Math.floor(endTime / 1000);
-        const now = Math.floor(Date.now() / 1000);
-        const timeLeft = endTimeUnix - now;
         
-        console.log(`⏰ Giveaway timing: Now=${now}, End=${endTimeUnix}, Left=${timeLeft} seconds`);
-        
-        // Format time remaining properly
-        let timeDisplay;
-        if (timeLeft < 60) {
-            timeDisplay = `${timeLeft}s`;
-        } else if (timeLeft < 3600) {
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            timeDisplay = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-        } else if (timeLeft < 86400) {
-            const hours = Math.floor(timeLeft / 3600);
-            const minutes = Math.floor((timeLeft % 3600) / 60);
-            timeDisplay = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-        } else {
-            const days = Math.floor(timeLeft / 86400);
-            const hours = Math.floor((timeLeft % 86400) / 3600);
-            timeDisplay = hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-        }
+        console.log(`⏰ Giveaway timing: Ends at ${endTimeUnix} (${new Date(endTime).toISOString()})`);
         
         const embed = new EmbedBuilder()
             .setTitle(`**${name}**`)
             .setDescription(`**${description}**`)
             .setColor(orange)
             .addFields(
-                { name: '**Time Remaining**', value: `${timeDisplay} (<t:${endTimeUnix}:R>)`, inline: false },
+                { name: '**Ends in**', value: `<t:${endTimeUnix}:R>`, inline: false },
                 { name: '**Max Winners**', value: maxWinnersNum.toString(), inline: false },
                 { name: '**Entrants**', value: '0', inline: false }
             )
@@ -2593,33 +2573,13 @@ async function updateGiveawayEmbed(message) {
 
         const orange = 0xFFA500;
         const endTimeUnix = Math.floor(giveaway.end_time / 1000);
-        const now = Math.floor(Date.now() / 1000);
-        const timeLeft = endTimeUnix - now;
-        
-        // Format time remaining properly
-        let timeDisplay;
-        if (timeLeft < 60) {
-            timeDisplay = `${timeLeft}s`;
-        } else if (timeLeft < 3600) {
-            const minutes = Math.floor(timeLeft / 60);
-            const seconds = timeLeft % 60;
-            timeDisplay = seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
-        } else if (timeLeft < 86400) {
-            const hours = Math.floor(timeLeft / 3600);
-            const minutes = Math.floor((timeLeft % 3600) / 60);
-            timeDisplay = minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-        } else {
-            const days = Math.floor(timeLeft / 86400);
-            const hours = Math.floor((timeLeft % 86400) / 3600);
-            timeDisplay = hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-        }
         
         const embed = new EmbedBuilder()
             .setTitle(`**${giveaway.name}**`)
             .setDescription(`**${giveaway.description}**`)
             .setColor(orange)
             .addFields(
-                { name: '**Time Remaining**', value: `${timeDisplay} (<t:${endTimeUnix}:R>)`, inline: false },
+                { name: '**Ends in**', value: `<t:${endTimeUnix}:R>`, inline: false },
                 { name: '**Max Winners**', value: giveaway.max_winners.toString(), inline: false },
                 { name: '**Entrants**', value: entryCount.toString(), inline: false }
             )
