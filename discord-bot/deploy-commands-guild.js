@@ -198,6 +198,24 @@ const commands = [
             }
         ],
         defaultMemberPermissions: '8192' // MANAGE_MESSAGES
+    },
+    {
+        name: 'g-create',
+        description: 'Create a new giveaway (Admin only)',
+        defaultMemberPermissions: '0'
+    },
+    {
+        name: 'g-close',
+        description: 'Close an active giveaway (Admin only)',
+        options: [
+            {
+                name: 'message_id',
+                description: 'ID of the giveaway message to close',
+                type: 3, // STRING
+                required: true
+            }
+        ],
+        defaultMemberPermissions: '0'
     }
 ];
 
